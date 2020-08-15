@@ -43,9 +43,6 @@ typedef struct buffer_info
 	unsigned int max_buffer_sector;    // count for data buffer, unit is 512 B       
 	unsigned int buffer_sector_count;
 
-	unsigned int max_buffer_B;         //count for mapping buffer, unit is B
-	unsigned int buffer_B_count;
-
 	unsigned int max_command_buff_page;    //count for command buffer, unit is page 
 	unsigned int command_buff_page;
 

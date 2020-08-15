@@ -1,11 +1,11 @@
 #pragma once
 
-struct ssd_info *dynamic_advanced_process(struct ssd_info *ssd, unsigned int channel, unsigned int chip);
-//struct ssd_info *delete_from_ssd(struct ssd_info *ssd, unsigned int channel, struct sub_request * sub_req);
-struct ssd_info *delete_from_channel(struct ssd_info *ssd, unsigned int channel, struct sub_request * sub_req);
-struct ssd_info* compute_serve_time(struct ssd_info* ssd, unsigned int channel, unsigned int chip, struct sub_request** subs, unsigned int subs_counts);
+#include "initialize.h"
 
-Status services_2_r_complete(struct ssd_info * ssd);
+struct ssd_info* dynamic_advanced_process(struct ssd_info *ssd, unsigned int channel, unsigned int chip);
+struct ssd_info* delete_from_channel(struct ssd_info *ssd, unsigned int channel, struct sub_request * sub_req);
+struct ssd_info* compute_write_serve_time(struct ssd_info* ssd, unsigned int channel, unsigned int chip, struct sub_request** subs, unsigned int subs_counts);
+
 Status services_2_write(struct ssd_info * ssd, unsigned int channel);
 Status service_2_read(struct ssd_info *ssd, unsigned int channel);
 
@@ -24,7 +24,5 @@ Status Multi_Plane_Read(struct ssd_info* ssd, struct sub_request* sub0, struct s
 Status Read(struct ssd_info* ssd, struct sub_request* sub);
 
 struct ssd_info* compute_read_serve_time(struct ssd_info* ssd, unsigned int channel, struct sub_request** subs, unsigned int subs_count);
-int IS_Update_Done(struct ssd_info* ssd, struct sub_request* sub);
 void Invalidate_old_lpn(struct ssd_info* ssd,unsigned int lpn);
-int IS_Tran_Read_Done(struct ssd_info* ssd, struct sub_request* sub);
 Status Is_migrated(struct ssd_info* ssd, struct sub_request* sub);

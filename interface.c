@@ -25,14 +25,13 @@ extern int secno_num_per_page, secno_num_sub_page;
 int get_requests(struct ssd_info *ssd)
 {
 	char buffer[200];
-	unsigned int lsn = 0;
-	int device, size, ope, large_lsn, i = 0, j = 0, max_lsn;
+	unsigned int lsn = 0, large_lsn = 0, max_lsn = 0, fing = 0;
+	int size = 0, ope = -1, i = 0, j = 0;
 	struct request *request1;
 	int flag = 1;
 	long filepoint;
 	__int64 time_t;
 	__int64 nearest_event_time;
-
 
 #ifdef DEBUG
 	printf("enter get_requests,  current time:%I64u\n", ssd->current_time);
@@ -47,35 +46,40 @@ int get_requests(struct ssd_info *ssd)
 			ssd->current_time += 5000000;
 		return 0;
 	}
-	
-	ope = 0;
 
 	large_lsn = (int)((secno_num_per_page * ssd->parameter->page_block * ssd->parameter->block_plane * ssd->parameter->plane_die * ssd->parameter->die_chip * ssd->parameter->chip_num) / (1 + ssd->parameter->overprovide));
-	max_lsn = (int)(large_lsn * 0.8);
+	max_lsn = (int)(large_lsn * 1);
 
 	while (TRUE)
 	{
 		filepoint = ftell(ssd->tracefile);
 		fgets(buffer, 200, ssd->tracefile);
-		sscanf(buffer, "%I64u %d %d %d %d", &time_t, &device, &lsn, &size, &ope);
+		sscanf(buffer, "%I64u %d %d %d %d", &time_t, &lsn, &size, &ope, &fing);
 		
-		time_t = time_t * 10;
+		// time_t = time_t * 10;
 
 		if (feof(ssd->tracefile))      //if the end of trace
 			break;
+		
+		if (size != 8)
+		{
+			printf("ERROR: request size is not 4KB!!!\n");
+			continue;
+		}
 
 		if (lsn > max_lsn)
 		{
 			lsn = lsn % max_lsn;
 		}
 
-		//if (ssd->warm_flash_cmplt == 0 && ope == 0)
-			//continue;
+		if (ssd->warm_flash_cmplt == 0 && ope == READ)
+			ope = WRITE;
 
-		/*
-		if (ssd->request_lz_count > 1000000)
-			ssd->trace_over_flag = 1;
-		*/
+		// if (ssd->warm_flash_cmplt == 1 && ope == READ)
+		// 	continue;
+
+		// if (ssd->request_lz_count > 1000000)
+		// 	ssd->trace_over_flag = 1;
 
 		if (ssd->parameter->data_dram_capacity == 0)
 			break;
@@ -83,7 +87,7 @@ int get_requests(struct ssd_info *ssd)
 			break;
 	}
 
-	if ((device < 0) && (lsn < 0) && (size < 0) && (ope < 0))
+	if ((lsn < 0) && (size < 0) && (ope < 0) && (fing < 1))
 	{
 		return 100;
 	}
@@ -174,21 +178,13 @@ int get_requests(struct ssd_info *ssd)
 	request1->time = time_t;
 	request1->lsn = lsn;
 	request1->size = size;
-
-	/*
-	if (ssd->warm_flash_cmplt == 1)
-		ope = WRITE;
-	*/
-
+	request1->fing = fing;
 	request1->operation = ope;
 	request1->begin_time = time_t;
 
 	request1->response_time = 0;
-//	request1->request_read_num = ssd->request_lz_count;
 	request1->next_node = NULL;
-	request1->distri_flag = 0;              // indicate whether this request has been distributed already
 	request1->subs = NULL;
-	request1->need_distr_flag = NULL;
 	request1->complete_lsn_count = 0;       //record the count of lsn served by buffer
 	filepoint = ftell(ssd->tracefile);		// set the file point
 
@@ -201,7 +197,7 @@ int get_requests(struct ssd_info *ssd)
 	}
 	else
 	{
-		(ssd->request_tail)->next_node = request1;
+		ssd->request_tail->next_node = request1;
 		ssd->request_tail = request1;
 		if (ssd->request_work == NULL)
 			ssd->request_work = request1;
@@ -210,24 +206,12 @@ int get_requests(struct ssd_info *ssd)
 
 	ssd->request_lz_count++;
 
-	if (ssd->request_lz_count % 10000 == 0)
-		printf("request:%I64u\n", ssd->request_lz_count);
-
-	/*
-		if(ssd->warm_flash_cmplt == 1)
-		printf("request:%I64u\n", ssd->request_lz_count);
-	else
-	{
-		if (ssd->request_lz_count % 10000 == 0)
-			printf("request:%I64u\n", ssd->request_lz_count);
-	}
-	*/
+	if (ssd->request_lz_count % 100000 == 0)
+		printf("request:%lu\n", ssd->request_lz_count);
 
 	if (request1->operation == READ)             //Calculate the average request size ,1 for read 0 for write
 	{
 		ssd->ave_read_size = (ssd->ave_read_size*ssd->read_request_count + request1->size) / (ssd->read_request_count + 1);
-		ssd->test_count++;
-		request1->request_read_num = ssd->test_count;
 	}
 	else
 	{
@@ -236,7 +220,7 @@ int get_requests(struct ssd_info *ssd)
 
 	filepoint = ftell(ssd->tracefile);
 	fgets(buffer, 200, ssd->tracefile);    //find the arrival time of the next request
-	sscanf(buffer, "%I64u %d %d %d %d", &time_t, &device, &lsn, &size, &ope);
+	sscanf(buffer, "%I64u %d %d %d %d", &time_t, &lsn, &size, &ope, &fing);
 	ssd->next_request_time = time_t;
 	fseek(ssd->tracefile, filepoint, 0);
 
@@ -276,7 +260,7 @@ __int64 find_nearest_event(struct ssd_info *ssd)
 	*time return: A.next state is CHANNEL_IDLE and next_state_predict_time> ssd->current_time
 	*			  B.next state is CHIP_IDLE and next_state_predict_time> ssd->current_time
 	*			  C.next state is CHIP_DATA_TRANSFER and next_state_predict_time> ssd->current_time
-	*A/B/C all not meet£¬return 0x7fffffffffffffff,means channel and chip is idle
+	*A/B/C all not meetï¿½ï¿½return 0x7fffffffffffffff,means channel and chip is idle
 	*****************************************************************************************************/
 	time = (time1>time2) ? time2 : time1;
 	return time;
