@@ -334,26 +334,13 @@ struct die_info{
 };
 
 struct plane_info{
-	int add_reg_ppn;                    //Read, write address to the variable, the variable represents the address register. When the die is changed from busy to idle, clear the address
 	unsigned int free_page;             //the number of free page in plane
-	unsigned int active_block;          //The physical block number of the active block
 
-	unsigned long plane_read_count;		//Record the number of read/program/erase in the plane
-	unsigned long plane_program_count;
-	unsigned long plane_erase_count;
-	unsigned long pre_plane_write_count;
-
-	struct direct_erase *erase_node;    //Used to record can be directly deleted block number, access to the new ppn, whenever the invalid_page_num == 64, it will be added to the pointer, for the GC operation directly delete
 	struct blk_info *blk_head;
 };
 
 
 struct blk_info{
-	unsigned int erase_count;          //The number of erasures for the block, which is recorded in ram for the GC
-	unsigned int page_read_count;	   //Record the number of read pages of the block
-	unsigned int page_write_count;	   //Record the number of write pages
-	unsigned int pre_write_count;	   //Record the number of times the prepress was written
-
 	unsigned int free_page_num;        //Record the number of pages in the block
 	unsigned int invalid_page_num;     //Record the number of invaild pages in the block
 
@@ -556,32 +543,6 @@ struct local{
 	unsigned int block;
 	unsigned int page;
 };
-
-
-struct gc_info{
-	__int64 begin_time;            //Record a plane when to start gc operation
-	int copy_back_count;    
-	int erase_count;
-	__int64 process_time;          //Record time the plane spent on gc operation
-	double energy_consumption;     //Record energy the plane takes on gc
-};
-
-
-struct direct_erase{
-	unsigned int block;
-	struct direct_erase *next_node;
-};
-
-struct allocation_info                       //��¼������Ϣ
-{
-	unsigned int channel;
-	unsigned int chip;
-	unsigned int die;
-	unsigned int plane;
-	unsigned int mount_flag;
-	struct buffer_info * aim_command_buffer;
-};
-
 
 struct ssd_info *initiation(struct ssd_info *);
 struct parameter_value *load_parameters(char parameter_file[30]);

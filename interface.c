@@ -12,7 +12,6 @@
 #include "buffer.h"
 #include "interface.h"
 #include "ftl.h"
-#include "fcl.h"
 
 extern int secno_num_per_page, secno_num_sub_page;
 /********    get_request    ******************************************************

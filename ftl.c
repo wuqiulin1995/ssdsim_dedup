@@ -5,15 +5,38 @@
 #include <math.h>
 
 #include "initialize.h"
-#include "ssd.h"
-#include "flash.h"
-#include "buffer.h"
 #include "interface.h"
+#include "ssd.h"
+#include "buffer.h"
 #include "ftl.h"
-#include "fcl.h"
+#include "flash.h"
 
 extern int secno_num_per_page, secno_num_sub_page;
-/******************************************************************************************������ftl��map����******************************************************************************************/
+
+Status invalidate_old_lpn(struct ssd_info* ssd, unsigned int lpn)
+{
+	unsigned int ppn;
+	unsigned int channel, chip, die, plane, block, page;
+	struct local loc;
+
+	ppn = ssd->dram->map->L2P_entry[lpn].pn;
+
+	if(ppn != INVALID_PPN)
+	{
+		find_location_ppn(ssd, ppn, &loc);
+		channel = loc.channel;
+		chip = loc.chip;
+		die = loc.die;
+		plane = loc.plane;
+		block = loc.block;
+		page = loc.page;
+
+		ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].ref_cnt = 0;
+		ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].invalid_page_num++;
+	}
+
+	return SUCCESS;
+}
 
 
 /*****************************************************************************
@@ -155,9 +178,11 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 							// insert2_command_buffer(ssd, ssd->dram->data_command_buffer, lpn, state, req);
 
 							new_ppn = get_new_page(ssd);
+							
 							if(new_ppn == INVALID_PPN)
 							{
 								printf("ERROR: get new page fail in GC\n");
+								getchar();
 							}
 
 							ssd_page_read(ssd, chan, chip);
@@ -319,15 +344,6 @@ Status find_active_superblock(struct ssd_info *ssd, struct request *req)
 	ssd->open_sb = ssd->sb_pool + min_sb;
 	ssd->free_sb_cnt--;
 
-	// /*
-	// judge whether GC is triggered
-	// note need to reduce the influence of mixture of GC data and user data
-    // */
-	// if(ssd->free_sb_cnt <= MIN_SB_RATE * ssd->sb_cnt)
-	// {
-	// 	SuperBlock_GC(ssd, req);
-	// }
-
 	return SUCCESS;
 }
 
@@ -365,7 +381,8 @@ unsigned int get_new_page(struct ssd_info *ssd)
 
 	if (page == ssd->parameter->page_block)
 	{
-		printf("ERROR page == ssd->parameter->page_block\n");
+		printf("ERROR: page == ssd->parameter->page_block\n");
+		getchar();
 	}
 
 	if (ssd->open_sb->pg_off == ssd->open_sb->blk_cnt - 1)
@@ -397,7 +414,8 @@ Status update_new_page_mapping(struct ssd_info *ssd, unsigned int lpn, unsigned 
 
 	if (ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].last_write_page != page)
 	{
-		printf("ERROR last_write_page != loc.page\n");
+		printf("ERROR: last_write_page != loc.page\n");
+		getchar();
 	}
 
 	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn = lpn;

@@ -7,13 +7,9 @@
 #include "buffer.h"
 #include "interface.h"
 #include "ftl.h"
-#include "fcl.h"
 
 #define FALSE		0
 #define TRUE		1
-
-#define ACTIVE_FIXED 0
-#define ACTIVE_ADJUST 1
 
 extern int secno_num_per_page, secno_num_sub_page;
 
@@ -419,11 +415,6 @@ struct blk_info * initialize_block(struct blk_info * p_block,struct parameter_va
 {
 	unsigned int i;
 	struct page_info * p_page;
-	
-	p_block->erase_count = 0;
-	p_block->page_read_count = 0;
-	p_block->page_write_count = 0;
-	p_block->pre_write_count = 0;
 
 	p_block->free_page_num = parameter->page_block;	// all pages are free
 	p_block->last_write_page = -1;	// no page has been programmed
@@ -446,12 +437,7 @@ struct plane_info * initialize_plane(struct plane_info * p_plane,struct paramete
 {
 	unsigned int i;
 	struct blk_info * p_block;
-	p_plane->add_reg_ppn = -1;  //Plane address register additional register -1 means no data
 	p_plane->free_page=parameter->block_plane*parameter->page_block;
-	p_plane->plane_read_count = 0;
-	p_plane->plane_program_count = 0;
-	p_plane->plane_erase_count = 0;
-	p_plane->pre_plane_write_count = 0;;
 
 	p_plane->blk_head = (struct blk_info *)malloc(parameter->block_plane * sizeof(struct blk_info));
 	alloc_assert(p_plane->blk_head,"p_plane->blk_head");

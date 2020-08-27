@@ -8,12 +8,11 @@
 #include <crtdbg.h>  
 #include <assert.h>
 
-#include "ssd.h"
 #include "initialize.h"
 #include "interface.h"
+#include "ssd.h"
 #include "buffer.h"
 #include "ftl.h"
-#include "fcl.h"
 #include "flash.h"
 
 int secno_num_per_page, secno_num_sub_page;
@@ -117,42 +116,26 @@ struct ssd_info *warm_flash(struct ssd_info *ssd)
 
 	while (flag != 100)
 	{
-		/*interface layer*/
-		flag = get_requests(ssd);
+		flag = get_requests(ssd); 
 
-		/*buffer layer*/
 		if (flag == 1 || (flag == 0 && ssd->request_work != NULL))
 		{
-			if (ssd->parameter->data_dram_capacity != 0)
-			{
-				if (ssd->buffer_full_flag == 0)				//buffer don't block,it can be handle.
-				{
-					buffer_management(ssd);
-				}
-			}
-			else
-			{
-				no_buffer_distribute(ssd);
-			}
+			handle_new_request(ssd);
+
 			if (ssd->request_work->cmplt_flag == 1)
 			{
 				if (ssd->request_work != ssd->request_tail)
 					ssd->request_work = ssd->request_work->next_node;
 				else
 					ssd->request_work = NULL;
-			}
-
+			}	
 		}
-
-		/*ftl+fcl+flash layer*/
-		process(ssd);
 
 		trace_output(ssd);
 
 		if (flag == 0 && ssd->request_queue == NULL)
 			flag = 100;
 	}
-	flush_sub_request(ssd);
 	fclose(ssd->tracefile);
 	return ssd;
 }
@@ -184,38 +167,21 @@ struct ssd_info *simulate(struct ssd_info *ssd)
 	}
 
 	while(flag!=100)      
-	{        
-		/*interface layer*/
+	{
 		flag = get_requests(ssd); 
 
-		// /*buffer layer*/
-		// if (flag == 1 || (flag == 0 && ssd->request_work != NULL))
-		// {   
-		// 	if (ssd->parameter->data_dram_capacity !=0)
-		// 	{
-		// 		if (ssd->buffer_full_flag == 0)				//buffer don't block,it can be handle.
-		// 		{
-		// 			buffer_management(ssd);
-		// 		}
-		// 	} 
-		// 	else
-		// 	{
-		// 		no_buffer_distribute(ssd);
-		// 	}
+		if (flag == 1 || (flag == 0 && ssd->request_work != NULL))
+		{
+			handle_new_request(ssd);
 
-		// 	if (ssd->request_work->cmplt_flag == 1)
-		// 	{
-		// 		if (ssd->request_work != ssd->request_tail)
-		// 			ssd->request_work = ssd->request_work->next_node;
-		// 		else
-		// 			ssd->request_work = NULL;
-		// 	}
-		// }
-
-		// /*ftl+fcl+flash layer*/
-		// process(ssd); 
-
-		handle_new_request(ssd);
+			if (ssd->request_work->cmplt_flag == 1)
+			{
+				if (ssd->request_work != ssd->request_tail)
+					ssd->request_work = ssd->request_work->next_node;
+				else
+					ssd->request_work = NULL;
+			}	
+		}
 
 		trace_output(ssd);
 	
@@ -226,94 +192,6 @@ struct ssd_info *simulate(struct ssd_info *ssd)
 	fclose(ssd->tracefile);
 	return ssd;
 }
-
-
-/********************************************************
-*the main function :Controls the state change processing 
-*of the read request and the write request
-*********************************************************/
-struct ssd_info *process(struct ssd_info *ssd)
-{
-	int old_ppn = -1, flag_die = -1;
-	unsigned int i,j,k,m,p,chan, random_num;
-	unsigned int flag = 0, new_write = 0, chg_cur_time_flag = 1, flag2 = 0, flag_gc = 0;
-	unsigned int count1;
-	__int64 time, channel_time = 0x7fffffffffffffff;
-	unsigned int process_cnt = 0;
-#ifdef DEBUG
-	printf("enter process,  current time:%I64u\n", ssd->current_time);
-#endif
-
-	/*********************************************************
-	*flag=0, processing read and write sub_requests
-	*flag=1, processing gc request
-	**********************************************************/
-	for (i = 0; i<ssd->parameter->channel_number; i++)
-	{
-		if ((ssd->channel_head[i].subs_r_head == NULL) && (ssd->channel_head[i].subs_w_head == NULL) && (ssd->subs_w_head == NULL))
-		{
-			flag = 1;
-			ssd->current_time += 1000;
-		}
-		else
-		{
-			flag = 0;
-			break;
-		}
-	}
-	if (flag == 1)
-	{
-		ssd->flag = 1;
-		return ssd;
-	}
-	else
-	{
-		ssd->flag = 0;
-	}
-
-	/*********************************************************
-	*Gc operation is completed, the read and write state changes
-	**********************************************************/
-	time = ssd->current_time;
-
-	for (process_cnt = 0; process_cnt < ssd->process_enhancement; process_cnt++)
-	{
-		for (chan = 0; chan < ssd->parameter->channel_number; chan++)
-		{
-			i = chan % ssd->parameter->channel_number;
-			flag_gc = 0;
-			ssd->channel_head[i].channel_busy_flag = 0;
-			if ((ssd->channel_head[i].current_state == CHANNEL_IDLE) || (ssd->channel_head[i].next_state == CHANNEL_IDLE && ssd->channel_head[i].next_state_predict_time <= ssd->current_time))
-			{
-				if ((ssd->channel_head[i].channel_busy_flag == 0) && (ssd->channel_head[i].subs_r_head != NULL))					  //chg_cur_time_flag=1,current_time has changed��chg_cur_time_flag=0,current_time has not changed  			
-				{
-					//set high prority to read request
-					service_2_read(ssd, i);
-				}
-
-				if (ssd->channel_head[i].channel_busy_flag == 0)
-					services_2_write(ssd, i);
-			}
-		}
-	}
-
-	return ssd;
-}
-
-void flush_sub_request(struct ssd_info* ssd)
-{
-	unsigned int i;
-	ssd->current_time = 99999999999999;
-	for (i = 0; i < ssd->parameter->channel_number; i++)
-	{
-		while (ssd->channel_head[i].subs_r_head != NULL || ssd->channel_head[i].subs_w_head != NULL)					  //chg_cur_time_flag=1,current_time has changed��chg_cur_time_flag=0,current_time has not changed  			
-		{
-			service_2_read(ssd, i);
-			services_2_write(ssd, i);
-		}
-	}
-}
-
 
 /**********************************************************************
 *The trace_output () is executed after all the sub requests of each request 
@@ -353,7 +231,7 @@ void trace_output(struct ssd_info *ssd)
 
 			if (req->response_time - req->time == 0)
 			{
-				printf("the response time is 0?? \n");
+				printf("the request simulation time is 0?? \n");
 			}
 
 			if (req->operation == READ)
@@ -397,7 +275,7 @@ void trace_output(struct ssd_info *ssd)
 					ssd->request_queue = req->next_node;
 					pre_node = req;
 					req = req->next_node;
-					free((void *)pre_node);
+					free(pre_node);
 					pre_node = NULL;
 					ssd->request_queue_length--;
 				}
@@ -415,176 +293,16 @@ void trace_output(struct ssd_info *ssd)
 				else
 				{
 					pre_node->next_node = req->next_node;
-					free((void *)req);
+					free(req);
 					req = pre_node->next_node;
 					ssd->request_queue_length--;
 				}
 			}
 		}
 		else
-		{
-			flag = 1;
-			while (sub != NULL)
-			{
-				if (start_time == 0)
-					start_time = sub->begin_time;
-				if (start_time > sub->begin_time)
-					start_time = sub->begin_time;
-				if (end_time < sub->complete_time)
-					end_time = sub->complete_time;
-				if ((sub->current_state == SR_COMPLETE) || ((sub->next_state == SR_COMPLETE) && (sub->next_state_predict_time <= ssd->current_time)))	// if any sub-request is not completed, the request is not completed
-				{
-					if (sub->complete_time <= sub->begin_time)
-						printf("Look Here 1\n");
-					sub = sub->next_subs;
-				}
-				else
-				{
-					flag = 0;
-					break;
-				}
-			}
-
-			if (flag == 1)
-			{
-				//fprintf(ssd->outputfile, "%16I64u %10u %6u %2u %16I64u %16I64u %10I64u\n", req->time, req->lsn, req->size, req->operation, start_time, end_time, end_time - req->time);
-				//fflush(ssd->outputfile);
-
-				if (end_time - start_time <= 0)
-				{
-					printf("the response time is 0?? \n");
-					getchar();
-				}
-
-				if (req->operation == READ)
-				{
-					ssd->read_request_count++;
-					ssd->read_avg = ssd->read_avg + (end_time - req->time);
-
-					// if (ssd->warm_flash_cmplt == 0) 
-					// {
-					// 	fprintf(ssd->outputfile, "Read begin time %16I64u  end time  %16I64u  run time  %16I64u \n", req->time, end_time, (end_time - req->time));
-					// 	fflush(ssd->outputfile);
-					// }
-
-					// if (ssd->read_avg / ssd->read_request_count > 100000000000000000)
-					// {
-					// 	tem = req->subs;
-					// 	while (tem)
-					// 	{
-					// 		if (ssd->warm_flash_cmplt == 0)
-					// 		{
-					// 			fprintf(ssd->sb_info, "end time %16I64u  ", tem->complete_time);
-					// 		}
-					// 		tem = tem->next_subs;
-					// 	}
-					// 	if (ssd->warm_flash_cmplt == 0)
-					// 	{
-					// 		fflush(ssd->sb_info);
-					// 	}
-					// 	printf("Look Here 2\n");
-					// }
-				}
-				else
-				{
-					ssd->write_request_count++;
-					ssd->write_avg = ssd->write_avg + (end_time - req->time);
-
-					// if (ssd->warm_flash_cmplt == 0)
-					// {
-					// 	fprintf(ssd->outputfile, "Write begin time %16I64u  end time  %16I64u  run time  %16I64u \n", req->time, end_time, (end_time - req->time));
-					// 	fflush(ssd->outputfile);
-					// }
-
-					// if (ssd->write_avg / ssd->write_request_count > 1000000000000000)
-					// {
-					// 	tem = req->subs;
-					// 	while (tem)
-					// 	{
-					// 		if (ssd->warm_flash_cmplt == 0)
-					// 		{
-					// 			fprintf(ssd->sb_info, "begin time %16I64u   end time %16I64u\n", tem->begin_time, tem->complete_time);
-					// 		}
-					// 		tem = tem->next_subs;
-					// 	}
-					// 	if (ssd->warm_flash_cmplt == 0)
-					// 	{
-					// 		fflush(ssd->sb_info);
-					// 	}
-					// 	printf("Look Here 3\n");
-					// }
-
-					if(end_time - req->time > ssd->max_write_delay_print)
-						ssd->max_write_delay_print = end_time - req->time;
-
-					if(ssd->warm_flash_cmplt == 1 && ssd->write_request_count > 1 && ssd->write_request_count % 10000 == 1)
-					{
-						ssd->avg_write_delay_print = (ssd->write_avg - ssd->last_write_avg) / 10000;
-						ssd->last_write_avg = ssd->write_avg;
-
-						fprintf(ssd->stat_file, "%lld, %lld\n", ssd->avg_write_delay_print, ssd->max_write_delay_print);
-						fflush(ssd->stat_file);
-
-						ssd->avg_write_delay_print = 0;
-						ssd->max_write_delay_print = 0;
-					}
-				}
-				while (req->subs != NULL)
-				{
-					tmp = req->subs;
-					req->subs = tmp->next_subs;
-
-					free(tmp->location);
-					tmp->location = NULL;
-					free(tmp);
-					tmp = NULL;
-
-				}
-				if (pre_node == NULL)
-				{
-					if (req->next_node == NULL)
-					{
-						free(req);
-						req = NULL;
-						ssd->request_queue = NULL;
-						ssd->request_tail = NULL;
-						ssd->request_queue_length--;
-					}
-					else
-					{
-						ssd->request_queue = req->next_node;
-						pre_node = req;
-						req = req->next_node;
-						free(pre_node);
-						pre_node = NULL;
-						ssd->request_queue_length--;
-					}
-				}
-				else
-				{
-					if (req->next_node == NULL)
-					{
-						pre_node->next_node = NULL;
-						free(req);
-						req = NULL;
-						ssd->request_tail = pre_node;
-						ssd->request_queue_length--;
-					}
-					else
-					{
-						pre_node->next_node = req->next_node;
-						free(req);
-						req = pre_node->next_node;
-						ssd->request_queue_length--;
-					}
-
-				}
-			}
-			else
-			{
-				pre_node = req;
-				req = req->next_node;
-			}
+		{		
+			printf("the request response time is 0?? \n");
+			getchar();
 		}
 	}
 }
@@ -603,87 +321,19 @@ void statistic_output(struct ssd_info *ssd)
 	printf("enter statistic_output,  current time:%I64u\n",ssd->current_time);
 #endif
 
-	// for(i = 0;i<ssd->parameter->channel_number;i++)
-	// {
-	// 	for (p = 0; p < ssd->parameter->chip_channel[i]; p++)
-	// 	{
-	// 		for (j = 0; j < ssd->parameter->die_chip; j++)
-	// 		{
-	// 			for (k = 0; k < ssd->parameter->plane_die; k++)
-	// 			{
-	// 				for (m = 0; m < ssd->parameter->block_plane; m++)
-	// 				{
-	// 					if (ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].erase_count > 0)
-	// 					{
-	// 						ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_erase_count += ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].erase_count;
-	// 					}
-
-	// 					if (ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].page_read_count > 0)
-	// 					{
-	// 						ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_read_count += ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].page_read_count;
-	// 					}
-
-	// 					if (ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].page_write_count > 0)
-	// 					{
-	// 						ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_program_count += ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].page_write_count;
-	// 					}
-
-	// 					if (ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].pre_write_count > 0)
-	// 					{
-	// 						ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].pre_plane_write_count += ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].pre_write_count;
-	// 					}
-	// 				}
-					
-	// 				fprintf(ssd->statisticfile, "the %d channel, %d chip, %d die, %d plane has : ", i, p, j, k);
-	// 				fprintf(ssd->statisticfile, "%3lu erase operations,", ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_erase_count);
-	// 				fprintf(ssd->statisticfile, "%3lu read operations,", ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_read_count);
-	// 				fprintf(ssd->statisticfile, "%3lu write operations,", ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_program_count);
-	// 				fprintf(ssd->statisticfile, "%3lu pre_process write operations\n", ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].pre_plane_write_count);
-	// 			}
-	// 		}
-	// 	}
-	// }
-
-	fprintf(ssd->statisticfile,"\n");
 	fprintf(ssd->statisticfile,"\n");
 	fprintf(ssd->statisticfile,"---------------------------statistic data---------------------------\n");
 	fprintf(ssd->statisticfile,"min lsn: %13d\n",ssd->min_lsn);
 	fprintf(ssd->statisticfile,"max lsn: %13d\n",ssd->max_lsn);
-	// fprintf(ssd->statisticfile, "the request read hit count: %13lu\n", ssd->req_read_hit_cnt);
 	fprintf(ssd->statisticfile, "\n");
 
-	fprintf(ssd->statisticfile, "the write operation leaded by pre_process write count: %13lu\n", ssd->pre_all_write);
 	fprintf(ssd->statisticfile, "\n");
 	fprintf(ssd->statisticfile, "erase count: %13lu\n",ssd->erase_count);
-	fprintf(ssd->statisticfile, "direct erase count: %13lu\n",ssd->direct_erase_count);
 	fprintf(ssd->statisticfile, "gc count: %13lu\n", ssd->gc_count);
 
 	fprintf(ssd->statisticfile, "\n");
 	fprintf(ssd->statisticfile, "data read cnt: %13d\n", ssd->data_read_cnt);
 	fprintf(ssd->statisticfile, "data program: %13d\n", ssd->data_program_cnt);
-
-	// fprintf(ssd->statisticfile, "\n\n\n");
-	// fprintf(ssd->statisticfile, "\nclose superblock count: %13d\n", ssd->close_superblock_cnt);
-	// fprintf(ssd->statisticfile, "\nreallocate write_request count: %13d\n", ssd->reallocate_write_request_cnt);
-	// fprintf(ssd->statisticfile, "\n\n\n\n");
-
-	// fprintf(ssd->statisticfile, "multi-plane program count: %13lu\n", ssd->m_plane_prog_count);
-	// fprintf(ssd->statisticfile, "multi-plane read count: %13lu\n", ssd->m_plane_read_count);
-	// fprintf(ssd->statisticfile, "\n");
-
-	// fprintf(ssd->statisticfile, "mutli plane one shot program count : %13lu\n", ssd->mutliplane_oneshot_prog_count);
-	// fprintf(ssd->statisticfile, "one shot program count : %13lu\n", ssd->ontshot_prog_count);
-	// fprintf(ssd->statisticfile, "\n");
-
-	// fprintf(ssd->statisticfile, "half page read count : %13lu\n", ssd->half_page_read_count);
-	// fprintf(ssd->statisticfile, "one shot read count : %13lu\n", ssd->one_shot_read_count);
-	// fprintf(ssd->statisticfile, "mutli plane one shot read count : %13lu\n", ssd->one_shot_mutli_plane_count);
-	// fprintf(ssd->statisticfile, "\n");
-
-	// fprintf(ssd->statisticfile, "erase suspend count : %13lu\n", ssd->suspend_count);
-	// fprintf(ssd->statisticfile, "erase resume  count : %13lu\n", ssd->resume_count);
-	// fprintf(ssd->statisticfile, "suspend read  count : %13lu\n", ssd->suspend_read_count);
-	// fprintf(ssd->statisticfile, "\n");
 
 	fprintf(ssd->statisticfile, "\n");
 	
@@ -698,20 +348,7 @@ void statistic_output(struct ssd_info *ssd)
 	if (ssd->write_request_count != 0)
 		fprintf(ssd->statisticfile, "write request average response time: %16I64u\n", ssd->write_avg / ssd->write_request_count);
 	fprintf(ssd->statisticfile, "\n");
-	// fprintf(ssd->statisticfile,"buffer read hits: %13lu\n",ssd->dram->data_buffer->read_hit);
-	// fprintf(ssd->statisticfile,"buffer read miss: %13lu\n",ssd->dram->data_buffer->read_miss_hit);
-	// fprintf(ssd->statisticfile,"buffer write hits: %13lu\n",ssd->dram->data_buffer->write_hit);
-	// fprintf(ssd->statisticfile,"buffer write miss: %13lu\n",ssd->dram->data_buffer->write_miss_hit);
-	
-	// fprintf(ssd->statisticfile, "half page read count : %13lu\n", ssd->half_page_read_count);
-	// fprintf(ssd->statisticfile, "mutli plane one shot program count : %13lu\n", ssd->mutliplane_oneshot_prog_count);
-	// fprintf(ssd->statisticfile, "one shot read count : %13lu\n", ssd->one_shot_read_count);
-	// fprintf(ssd->statisticfile, "mutli plane one shot read count : %13lu\n", ssd->one_shot_mutli_plane_count);
-	// fprintf(ssd->statisticfile, "erase suspend count : %13lu\n", ssd->suspend_count);
-	// fprintf(ssd->statisticfile, "erase resume  count : %13lu\n", ssd->resume_count);
-	// fprintf(ssd->statisticfile, "suspend read  count : %13lu\n", ssd->suspend_read_count);
 
-	fprintf(ssd->statisticfile, "\n");
 	fflush(ssd->statisticfile);
 
 	fclose(ssd->outputfile);
@@ -726,9 +363,6 @@ void free_all_node(struct ssd_info *ssd)
 {
 	unsigned int i,j,k,l,n,p;
 	struct buffer_group *pt=NULL;
-	struct direct_erase * erase_node=NULL;
-
-//	struct gc_operation *gc_node = NULL;
 
 	avlTreeDestroy( ssd->dram->data_buffer);
 	ssd->dram->data_buffer =NULL;
@@ -768,14 +402,6 @@ void free_all_node(struct ssd_info *ssd)
 					assert(ssd->channel_head[i].chip_head[j].die_head[k].plane_head[l].blk_head);
 					free(ssd->channel_head[i].chip_head[j].die_head[k].plane_head[l].blk_head);
 					ssd->channel_head[i].chip_head[j].die_head[k].plane_head[l].blk_head = NULL;
-					while (ssd->channel_head[i].chip_head[j].die_head[k].plane_head[l].erase_node != NULL)
-					{
-						erase_node = ssd->channel_head[i].chip_head[j].die_head[k].plane_head[l].erase_node;
-						ssd->channel_head[i].chip_head[j].die_head[k].plane_head[l].erase_node = erase_node->next_node;
-						assert(erase_node);
-						free(erase_node);
-						erase_node = NULL;
-					}
 				}
 				assert(ssd->channel_head[i].chip_head[j].die_head[k].plane_head);
 				free(ssd->channel_head[i].chip_head[j].die_head[k].plane_head);
