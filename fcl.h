@@ -24,5 +24,5 @@ Status Multi_Plane_Read(struct ssd_info* ssd, struct sub_request* sub0, struct s
 Status Read(struct ssd_info* ssd, struct sub_request* sub);
 
 struct ssd_info* compute_read_serve_time(struct ssd_info* ssd, unsigned int channel, struct sub_request** subs, unsigned int subs_count);
-void Invalidate_old_lpn(struct ssd_info* ssd,unsigned int lpn);
+void invalidate_old_lpn(struct ssd_info* ssd,unsigned int lpn);
 Status Is_migrated(struct ssd_info* ssd, struct sub_request* sub);

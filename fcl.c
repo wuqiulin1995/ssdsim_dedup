@@ -396,37 +396,31 @@ Status Add_mapping_entry(struct ssd_info* ssd, struct sub_request* sub)
 
 	lpn = sub->lpn;
 	if (ssd->dram->map->L2P_entry[lpn].pn != INVALID_PPN)
-		Invalidate_old_lpn(ssd, lpn);
+		invalidate_old_lpn(ssd, lpn);
 
 	ssd->dram->map->L2P_entry[lpn].pn = find_ppn(ssd, channel, chip, die, plane, block, page);
 	
 	return SUCCESS;
 }
 
-void Invalidate_old_lpn(struct ssd_info* ssd, unsigned int lpn)
+void invalidate_old_lpn(struct ssd_info* ssd, unsigned int lpn)
 {
 	unsigned int ppn;
 	unsigned int channel, chip, die, plane, block, page;
-	//struct sub_request* sub_read;
-	//struct request* req;
-	struct local* loc;
-	unsigned int status;
+	struct local loc;
 
 	ppn = ssd->dram->map->L2P_entry[lpn].pn;
-	//2. invalidate the correspending physical page
-	loc = find_location_ppn(ssd, ppn);
-	channel = loc->channel;
-	chip = loc->chip;
-	die = loc->die;
-	plane = loc->plane;
-	block = loc->block;
-	page = loc->page;
+
+	find_location_ppn(ssd, ppn, &loc);
+	channel = loc.channel;
+	chip = loc.chip;
+	die = loc.die;
+	plane = loc.plane;
+	block = loc.block;
+	page = loc.page;
 
 	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].ref_cnt = 0;
 	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].invalid_page_num++;
-
-	free(loc);
-	loc = NULL;
 }
 
 /****************************************************************************************************************************

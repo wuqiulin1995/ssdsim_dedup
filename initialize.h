@@ -436,7 +436,6 @@ struct request{
 	unsigned int operation;            //The type of request, 1 for the read, 0 for the write
 	unsigned int cmplt_flag;		   //Whether the request is executed, 0 means no execution, 1 means it has been executed
 	unsigned int fing;                 //fing
-	unsigned int complete_lsn_count;   //record the count of lsn served by buffer
 
 	__int64 begin_time;
 	__int64 response_time;

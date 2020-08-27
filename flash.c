@@ -99,3 +99,91 @@ Status NAND_multi_plane_read(struct ssd_info* ssd, struct sub_request* req0, str
 
 	return (flag0 & flag1);
 }
+
+__int64 ssd_page_read(struct ssd_info *ssd, unsigned int channel, unsigned int chip)
+{
+	__int64 start_transfer_ts = 0, read_time = 0, transfer_time = 0;
+
+	read_time = ssd->parameter->time_characteristics.tR;
+	transfer_time = 7 * ssd->parameter->time_characteristics.tWC + ssd->parameter->page_capacity * ssd->parameter->time_characteristics.tWC;
+
+	if ((ssd->channel_head[channel].chip_head[chip].current_state == CHIP_IDLE) ||
+			((ssd->channel_head[channel].chip_head[chip].next_state == CHIP_IDLE) &&
+			(ssd->channel_head[channel].chip_head[chip].next_state_predict_time <= ssd->current_time)))
+	{
+		ssd->channel_head[channel].chip_head[chip].current_state = CHIP_READ_BUSY;
+		ssd->channel_head[channel].chip_head[chip].current_time = ssd->current_time;
+		ssd->channel_head[channel].chip_head[chip].next_state = CHIP_IDLE;
+		ssd->channel_head[channel].chip_head[chip].next_state_predict_time = ssd->current_time + read_time;
+	}
+	else
+	{
+		ssd->channel_head[channel].chip_head[chip].next_state = CHIP_IDLE;
+		ssd->channel_head[channel].chip_head[chip].next_state_predict_time += read_time;
+	}
+
+	start_transfer_ts = ssd->channel_head[channel].chip_head[chip].next_state_predict_time;
+	
+	if ((ssd->channel_head[channel].current_state == CHANNEL_IDLE) ||
+		((ssd->channel_head[channel].next_state == CHANNEL_IDLE) &&
+		(ssd->channel_head[channel].next_state_predict_time <= start_transfer_ts)))
+	{
+		ssd->channel_head[channel].current_state = CHANNEL_TRANSFER;
+		ssd->channel_head[channel].current_time = ssd->current_time;
+		ssd->channel_head[channel].next_state = CHANNEL_IDLE;
+		ssd->channel_head[channel].next_state_predict_time = start_transfer_ts + transfer_time;
+	}
+	else
+	{
+		ssd->channel_head[channel].next_state = CHANNEL_IDLE;
+		ssd->channel_head[channel].next_state_predict_time += transfer_time;
+	}
+
+	ssd->data_read_cnt++;
+
+	return ssd->channel_head[channel].next_state_predict_time;
+}
+
+__int64 ssd_page_write(struct ssd_info *ssd, unsigned int channel, unsigned int chip)
+{
+	__int64 start_prog_ts = 0, prog_time = 0, transfer_time = 0;
+
+	prog_time = ssd->parameter->time_characteristics.tPROG;
+	transfer_time = 7 * ssd->parameter->time_characteristics.tWC + ssd->parameter->page_capacity * ssd->parameter->time_characteristics.tWC;
+
+	if ((ssd->channel_head[channel].current_state == CHANNEL_IDLE) ||
+		((ssd->channel_head[channel].next_state == CHANNEL_IDLE) &&
+		(ssd->channel_head[channel].next_state_predict_time <= ssd->current_time)))
+	{
+		ssd->channel_head[channel].current_state = CHANNEL_TRANSFER;
+		ssd->channel_head[channel].current_time = ssd->current_time;
+		ssd->channel_head[channel].next_state = CHANNEL_IDLE;
+		ssd->channel_head[channel].next_state_predict_time = ssd->current_time + transfer_time;
+	}
+	else
+	{
+		ssd->channel_head[channel].next_state = CHANNEL_IDLE;
+		ssd->channel_head[channel].next_state_predict_time += transfer_time;
+	}
+
+	start_prog_ts = ssd->channel_head[channel].chip_head[chip].next_state_predict_time;
+
+	if ((ssd->channel_head[channel].chip_head[chip].current_state == CHIP_IDLE) ||
+			((ssd->channel_head[channel].chip_head[chip].next_state == CHIP_IDLE) &&
+			(ssd->channel_head[channel].chip_head[chip].next_state_predict_time <= start_prog_ts)))
+	{
+		ssd->channel_head[channel].chip_head[chip].current_state = CHIP_WRITE_BUSY;
+		ssd->channel_head[channel].chip_head[chip].current_time = ssd->current_time;
+		ssd->channel_head[channel].chip_head[chip].next_state = CHIP_IDLE;
+		ssd->channel_head[channel].chip_head[chip].next_state_predict_time = ssd->current_time + prog_time;
+	}
+	else
+	{
+		ssd->channel_head[channel].chip_head[chip].next_state = CHIP_IDLE;
+		ssd->channel_head[channel].chip_head[chip].next_state_predict_time += prog_time;
+	}	
+
+	ssd->data_program_cnt++;
+
+	return ssd->channel_head[channel].chip_head[chip].next_state_predict_time;
+}

@@ -185,7 +185,6 @@ int get_requests(struct ssd_info *ssd)
 	request1->response_time = 0;
 	request1->next_node = NULL;
 	request1->subs = NULL;
-	request1->complete_lsn_count = 0;       //record the count of lsn served by buffer
 	filepoint = ftell(ssd->tracefile);		// set the file point
 
 	if (ssd->request_queue == NULL)          //The queue is empty

@@ -53,6 +53,95 @@ struct ssd_info *buffer_management(struct ssd_info *ssd)
 	return ssd;
 }
 
+struct ssd_info *handle_new_request(struct ssd_info *ssd)
+{
+	struct request *new_request;
+
+#ifdef DEBUG
+	printf("enter buffer_management,  current time:%I64u\n", ssd->current_time);
+#endif
+
+	ssd->dram->current_time = ssd->current_time;
+	new_request = ssd->request_work; 
+
+	if(new_request->size != 8)
+	{
+		printf("ERROR new_request->size = %d\n", new_request->size);
+	}
+
+	new_request->begin_time = ssd->current_time;
+
+	if(new_request->operation == READ)
+	{
+		handle_read_request(ssd, new_request);
+	}
+	else
+	{
+		handle_write_request(ssd, new_request);
+	}
+	
+	new_request->cmplt_flag = 1;
+	return ssd;
+}
+
+Status handle_write_request(struct ssd_info *ssd, struct request *req)
+{
+	unsigned int lpn = -1, old_ppn = INVALID_PPN, new_ppn = INVALID_PPN;
+	struct local loc;
+
+	lpn = req->lsn / secno_num_per_page;
+	old_ppn = ssd->dram->map->L2P_entry[lpn].pn;
+
+	new_ppn = get_new_page(ssd);
+
+	if(new_ppn == INVALID_PPN)
+	{
+		printf("ERROR: get new page fail\n");
+		req->response_time = ssd->current_time + 1000;
+	}
+
+	find_location_ppn(ssd, new_ppn, &loc);
+
+	req->response_time = ssd_page_write(ssd, loc.channel, loc.chip);
+
+	if(old_ppn != INVALID_PPN)
+	{
+		invalidate_old_lpn(ssd, lpn);
+	}
+	
+	update_new_page_mapping(ssd, lpn, new_ppn);
+
+	if(ssd->free_sb_cnt <= MIN_SB_RATE * ssd->sb_cnt)
+	{
+		SuperBlock_GC(ssd, req);
+	}
+
+	return SUCCESS;
+}
+
+Status handle_read_request(struct ssd_info *ssd, struct request *req)
+{
+	unsigned int lpn = -1, ppn = INVALID_PPN;
+	struct local loc;
+
+	lpn = req->lsn / secno_num_per_page;
+	ppn = ssd->dram->map->L2P_entry[lpn].pn;
+
+	if(ppn == INVALID_PPN)
+	{
+		printf("ERROR: READ INVALID_PPN\n");
+		req->response_time = ssd->current_time + 1000;
+	}
+	else
+	{
+		find_location_ppn(ssd, ppn, &loc);
+
+		req->response_time = ssd_page_read(ssd, loc.channel, loc.chip);
+	}
+
+	return SUCCESS;
+}
+
 struct ssd_info *handle_write_buffer(struct ssd_info *ssd, struct request *req)
 {
 	unsigned int full_page, lsn, lpn, last_lpn, first_lpn,i;
@@ -309,7 +398,6 @@ struct ssd_info* insert2buffer(struct ssd_info *ssd, unsigned int lpn, int state
 				buffer_node->LRU_link_pre = NULL;
 				ssd->dram->data_buffer->buffer_head = buffer_node;
 			}
-			req->complete_lsn_count += size(state);
 		}
 	}
 	
@@ -490,6 +578,8 @@ Status read_reqeust(struct ssd_info *ssd, unsigned int lpn, struct request *req,
 	alloc_assert(sub, "sub_request");
 	memset(sub, 0, sizeof(struct sub_request));
 
+	loc = (struct local*)malloc(sizeof(struct local));
+
 	if (sub == NULL)
 	{
 		return FAILURE;
@@ -507,7 +597,6 @@ Status read_reqeust(struct ssd_info *ssd, unsigned int lpn, struct request *req,
 	if (pn == -1) //hit in sub reqeust queue
 	{
 		ssd->req_read_hit_cnt++;
-		loc = (struct local*)malloc(sizeof(struct local));
 		sub->location = loc;
 
 		sub->lpn = lpn;
@@ -523,7 +612,8 @@ Status read_reqeust(struct ssd_info *ssd, unsigned int lpn, struct request *req,
 	{
 		sub->lpn = lpn;
 		sub->ppn = pn;
-		sub->location = find_location_ppn(ssd, pn);
+		find_location_ppn(ssd, pn, loc);
+		sub->location = loc;
 		sub->state = state;
 		sub->size = size(state);
 

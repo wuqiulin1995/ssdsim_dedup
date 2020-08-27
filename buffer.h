@@ -22,3 +22,7 @@ struct ssd_info* create_new_mapping_buffer(struct ssd_info* ssd, unsigned int lp
 
 unsigned int translate(struct ssd_info* ssd, unsigned int lpn, struct sub_request* sub);
 int get_cached_map_entry_cnt(struct ssd_info* ssd);
+
+struct ssd_info *handle_new_request(struct ssd_info *ssd);
+Status handle_read_request(struct ssd_info *ssd, struct request *req);
+Status handle_write_request(struct ssd_info *ssd, struct request *req);

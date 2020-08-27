@@ -63,9 +63,8 @@ unsigned int find_ppn(struct ssd_info * ssd, unsigned int channel, unsigned int 
 *function is based on the physical page number ppn find the physical page where the 
 *channel, chip, die, plane, block,In the structure location and as a return value
 *************************************************************************************/
-struct local* find_location_ppn(struct ssd_info* ssd, unsigned int ppn)
+Status find_location_ppn(struct ssd_info* ssd, unsigned int ppn, struct local *location)
 {
-	struct local* location = NULL;
 	int page_block, page_plane, page_die, page_chip, page_channel;
 
 	page_block = ssd->parameter->page_block;
@@ -78,10 +77,6 @@ struct local* find_location_ppn(struct ssd_info* ssd, unsigned int ppn)
 	printf("enter find_location\n");
 #endif
 
-	location = (struct local*)malloc(sizeof(struct local));
-	alloc_assert(location, "location");
-	memset(location, 0, sizeof(struct local));
-
 	location->channel = ppn / page_channel;
 	location->chip = (ppn % page_channel) / page_chip;
 	location->die = ((ppn % page_channel) % page_chip) / page_die;
@@ -89,7 +84,7 @@ struct local* find_location_ppn(struct ssd_info* ssd, unsigned int ppn)
 	location->block = ((((ppn % page_channel) % page_chip) % page_die) % page_plane) / page_block;
 	location->page = ((((ppn % page_channel) % page_chip) % page_die) % page_plane) % page_block;
 	
-	return location;
+	return SUCCESS;
 }
 
 //each time write operation is carried out, judge whether superblock-garbage is carried out
@@ -123,10 +118,11 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 	int i, j;
 	unsigned int chan, chip, die, plane, block, page;
 	unsigned int transer = 0;
-	unsigned int lpn, state;
-	unsigned int time;
+	unsigned int lpn, new_ppn = INVALID_PPN, state;
+	__int64 time;
 	unsigned int sum_md;
 	int ref_cnt;
+	struct local loc;
 
 	for (i = 0; i <= secno_num_per_page - 1; i++)
 		state = SET_VALID(state, i);
@@ -141,8 +137,8 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 		{
 			for (chip = 0; chip < ssd->parameter->chip_channel[chan]; chip++)
 			{
-				ssd->channel_head[chan].chip_head[chip].next_state_predict_time += ssd->parameter->time_characteristics.tR;
-				transer = 0;
+				// ssd->channel_head[chan].chip_head[chip].next_state_predict_time += ssd->parameter->time_characteristics.tR;
+				// transer = 0;
 				for (die = 0; die < ssd->parameter->die_chip; die++)
 				{
 					for (plane = 0; plane < ssd->parameter->plane_die; plane++)
@@ -150,25 +146,42 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 						ref_cnt = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].ref_cnt;
 						if (ref_cnt > 0)
 						{
-							transer++;
+							// transer++;
 							sum_md++;
 							lpn = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn;
 
 							//set mapping table invalid
-							ssd->dram->map->L2P_entry[lpn].pn = INVALID_PPN;
-							insert2_command_buffer(ssd, ssd->dram->data_command_buffer, lpn, state, req);
+							// ssd->dram->map->L2P_entry[lpn].pn = INVALID_PPN;
+							// insert2_command_buffer(ssd, ssd->dram->data_command_buffer, lpn, state, req);
+
+							new_ppn = get_new_page(ssd);
+							if(new_ppn == INVALID_PPN)
+							{
+								printf("ERROR: get new page fail in GC\n");
+							}
+
+							ssd_page_read(ssd, chan, chip);
+
+							ssd_page_write(ssd, loc.channel, loc.chip);
+
+							find_location_ppn(ssd, new_ppn, &loc);
+
+							invalidate_old_lpn(ssd, lpn);
+
+							update_new_page_mapping(ssd, lpn, new_ppn);
 						}
 					}
 				}
 				//transfer req to buffer and hand the request
-				if (transer > 0)
-				{
-					time = ssd->channel_head[chan].chip_head[chip].next_state_predict_time + transer * ssd->parameter->page_capacity * ssd->parameter->time_characteristics.tRC;
-					ssd->channel_head[chan].next_state_predict_time = (ssd->channel_head[chan].next_state_predict_time > time) ? time : ssd->channel_head[chan].next_state_predict_time;
-				}
+				// if (transer > 0)
+				// {
+				// 	time = ssd->channel_head[chan].chip_head[chip].next_state_predict_time + transer * ssd->parameter->page_capacity * ssd->parameter->time_characteristics.tRC;
+				// 	ssd->channel_head[chan].next_state_predict_time = (ssd->channel_head[chan].next_state_predict_time > time) ? time : ssd->channel_head[chan].next_state_predict_time;
+				// }
 			}
 		}
 	}
+
 	for (i = 0; i < ssd->sb_pool[victim].blk_cnt; i++)
 	{
 		chan = ssd->sb_pool[victim].pos[i].channel;
@@ -180,6 +193,7 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 		ssd->channel_head[chan].next_state = CHANNEL_IDLE;
 		erase_operation(ssd, chan, chip, die, plane, block);
 	}
+
 	for (i = 0; i < ssd->parameter->channel_number; i++)
 	{
 		for (j = 0; j < ssd->parameter->chip_channel[i]; j++)
@@ -188,9 +202,9 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 		}
 	}
 
+	ssd->sb_pool[victim].ec++;
 	ssd->sb_pool[victim].next_wr_page = 0;
 	ssd->sb_pool[victim].pg_off = -1;
-	ssd->sb_pool[victim].ec++;
 	ssd->sb_pool[victim].gcing = 0;
 
 	return sum_md;
@@ -276,12 +290,11 @@ int Get_SB_Invalid(struct ssd_info *ssd, unsigned int sb_no)
 /* 
     find superblock block with the minimal P/E cycles
 */
-Status find_active_superblock(struct ssd_info *ssd,struct request *req)
+Status find_active_superblock(struct ssd_info *ssd, struct request *req)
 {
 	int i;
 	int min_ec = 9999999;
 	int min_sb = -1;
-	unsigned int fsb_cnt;
 
 	for (i = 0; i < ssd->sb_cnt; i++)
 	{
@@ -304,29 +317,17 @@ Status find_active_superblock(struct ssd_info *ssd,struct request *req)
 
 	//set open superblock 
 	ssd->open_sb = ssd->sb_pool + min_sb;
-
 	ssd->free_sb_cnt--;
 
-	fsb_cnt = get_free_sb_count(ssd);
-	if (fsb_cnt != ssd->free_sb_cnt)
-	{
-		printf("Look here 5\n");
-	}
+	// /*
+	// judge whether GC is triggered
+	// note need to reduce the influence of mixture of GC data and user data
+    // */
+	// if(ssd->free_sb_cnt <= MIN_SB_RATE * ssd->sb_cnt)
+	// {
+	// 	SuperBlock_GC(ssd, req);
+	// }
 
-	/*
-	judge whether GC is triggered
-	note need to reduce the influence of mixture of GC data and user data
-    */
-	if(ssd->free_sb_cnt <= MIN_SB_RATE * ssd->sb_cnt)
-	{
-		SuperBlock_GC(ssd, req);
-	}
-
-	fsb_cnt = get_free_sb_count(ssd);
-	if(fsb_cnt != ssd->free_sb_cnt)
-	{
-		printf("Look here 6\n");
-	}
 	return SUCCESS;
 }
 
@@ -340,4 +341,67 @@ int get_free_sb_count(struct ssd_info* ssd)
 			cnt++;
 	}
 	return cnt;
+}
+
+unsigned int get_new_page(struct ssd_info *ssd)
+{
+	unsigned int channel = 0, chip = 0, die = 0, plane = 0, block = 0, page = 0;
+	unsigned int new_ppn = INVALID_PPN;
+
+	if (ssd->open_sb == NULL)
+		find_active_superblock(ssd, NULL);
+
+	if (ssd->open_sb->next_wr_page == ssd->parameter->page_block) //no free superpage in the superblock
+		find_active_superblock(ssd, NULL);
+
+	ssd->open_sb->pg_off = (ssd->open_sb->pg_off + 1) % ssd->open_sb->blk_cnt;
+
+	channel = ssd->open_sb->pos[ssd->open_sb->pg_off].channel;
+	chip = ssd->open_sb->pos[ssd->open_sb->pg_off].chip;
+	die = ssd->open_sb->pos[ssd->open_sb->pg_off].die;
+	plane = ssd->open_sb->pos[ssd->open_sb->pg_off].plane;
+	block = ssd->open_sb->pos[ssd->open_sb->pg_off].block;
+	page = ssd->open_sb->next_wr_page;
+
+	if (page == ssd->parameter->page_block)
+	{
+		printf("ERROR page == ssd->parameter->page_block\n");
+	}
+
+	if (ssd->open_sb->pg_off == ssd->open_sb->blk_cnt - 1)
+		ssd->open_sb->next_wr_page++;
+
+	new_ppn = find_ppn(ssd, channel, chip, die, plane, block, page);
+
+	return new_ppn;
+}
+
+Status update_new_page_mapping(struct ssd_info *ssd, unsigned int lpn, unsigned int ppn)
+{
+	unsigned int channel, chip, die, plane, block, page;
+	struct local loc;
+
+	ssd->dram->map->L2P_entry[lpn].pn = ppn;
+	
+	find_location_ppn(ssd, ppn, &loc);
+	channel = loc.channel;
+	chip = loc.chip;
+	die = loc.die;
+	plane = loc.plane;
+	block = loc.block;
+	page = loc.page;
+
+	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].last_write_page++;  //inlitialization is -1
+	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].free_page--;
+	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].free_page_num--;
+
+	if (ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].last_write_page != page)
+	{
+		printf("ERROR last_write_page != loc.page\n");
+	}
+
+	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn = lpn;
+	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].ref_cnt = 1;
+
+	return SUCCESS;
 }

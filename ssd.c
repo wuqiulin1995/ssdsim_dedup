@@ -188,32 +188,34 @@ struct ssd_info *simulate(struct ssd_info *ssd)
 		/*interface layer*/
 		flag = get_requests(ssd); 
 
-		/*buffer layer*/
-		if (flag == 1 || (flag == 0 && ssd->request_work != NULL))
-		{   
-			if (ssd->parameter->data_dram_capacity !=0)
-			{
-				if (ssd->buffer_full_flag == 0)				//buffer don't block,it can be handle.
-				{
-					buffer_management(ssd);
-				}
-			} 
-			else
-			{
-				no_buffer_distribute(ssd);
-			}
+		// /*buffer layer*/
+		// if (flag == 1 || (flag == 0 && ssd->request_work != NULL))
+		// {   
+		// 	if (ssd->parameter->data_dram_capacity !=0)
+		// 	{
+		// 		if (ssd->buffer_full_flag == 0)				//buffer don't block,it can be handle.
+		// 		{
+		// 			buffer_management(ssd);
+		// 		}
+		// 	} 
+		// 	else
+		// 	{
+		// 		no_buffer_distribute(ssd);
+		// 	}
 
-			if (ssd->request_work->cmplt_flag == 1)
-			{
-				if (ssd->request_work != ssd->request_tail)
-					ssd->request_work = ssd->request_work->next_node;
-				else
-					ssd->request_work = NULL;
-			}
-		}
+		// 	if (ssd->request_work->cmplt_flag == 1)
+		// 	{
+		// 		if (ssd->request_work != ssd->request_tail)
+		// 			ssd->request_work = ssd->request_work->next_node;
+		// 		else
+		// 			ssd->request_work = NULL;
+		// 	}
+		// }
 
-		/*ftl+fcl+flash layer*/
-		process(ssd); 
+		// /*ftl+fcl+flash layer*/
+		// process(ssd); 
+
+		handle_new_request(ssd);
 
 		trace_output(ssd);
 	
@@ -601,53 +603,53 @@ void statistic_output(struct ssd_info *ssd)
 	printf("enter statistic_output,  current time:%I64u\n",ssd->current_time);
 #endif
 
-	for(i = 0;i<ssd->parameter->channel_number;i++)
-	{
-		for (p = 0; p < ssd->parameter->chip_channel[i]; p++)
-		{
-			for (j = 0; j < ssd->parameter->die_chip; j++)
-			{
-				for (k = 0; k < ssd->parameter->plane_die; k++)
-				{
-					for (m = 0; m < ssd->parameter->block_plane; m++)
-					{
-						if (ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].erase_count > 0)
-						{
-							ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_erase_count += ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].erase_count;
-						}
+	// for(i = 0;i<ssd->parameter->channel_number;i++)
+	// {
+	// 	for (p = 0; p < ssd->parameter->chip_channel[i]; p++)
+	// 	{
+	// 		for (j = 0; j < ssd->parameter->die_chip; j++)
+	// 		{
+	// 			for (k = 0; k < ssd->parameter->plane_die; k++)
+	// 			{
+	// 				for (m = 0; m < ssd->parameter->block_plane; m++)
+	// 				{
+	// 					if (ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].erase_count > 0)
+	// 					{
+	// 						ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_erase_count += ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].erase_count;
+	// 					}
 
-						if (ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].page_read_count > 0)
-						{
-							ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_read_count += ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].page_read_count;
-						}
+	// 					if (ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].page_read_count > 0)
+	// 					{
+	// 						ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_read_count += ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].page_read_count;
+	// 					}
 
-						if (ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].page_write_count > 0)
-						{
-							ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_program_count += ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].page_write_count;
-						}
+	// 					if (ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].page_write_count > 0)
+	// 					{
+	// 						ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_program_count += ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].page_write_count;
+	// 					}
 
-						if (ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].pre_write_count > 0)
-						{
-							ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].pre_plane_write_count += ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].pre_write_count;
-						}
-					}
+	// 					if (ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].pre_write_count > 0)
+	// 					{
+	// 						ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].pre_plane_write_count += ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].blk_head[m].pre_write_count;
+	// 					}
+	// 				}
 					
-					fprintf(ssd->statisticfile, "the %d channel, %d chip, %d die, %d plane has : ", i, p, j, k);
-					fprintf(ssd->statisticfile, "%3lu erase operations,", ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_erase_count);
-					fprintf(ssd->statisticfile, "%3lu read operations,", ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_read_count);
-					fprintf(ssd->statisticfile, "%3lu write operations,", ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_program_count);
-					fprintf(ssd->statisticfile, "%3lu pre_process write operations\n", ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].pre_plane_write_count);
-				}
-			}
-		}
-	}
+	// 				fprintf(ssd->statisticfile, "the %d channel, %d chip, %d die, %d plane has : ", i, p, j, k);
+	// 				fprintf(ssd->statisticfile, "%3lu erase operations,", ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_erase_count);
+	// 				fprintf(ssd->statisticfile, "%3lu read operations,", ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_read_count);
+	// 				fprintf(ssd->statisticfile, "%3lu write operations,", ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].plane_program_count);
+	// 				fprintf(ssd->statisticfile, "%3lu pre_process write operations\n", ssd->channel_head[i].chip_head[p].die_head[j].plane_head[k].pre_plane_write_count);
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	fprintf(ssd->statisticfile,"\n");
 	fprintf(ssd->statisticfile,"\n");
 	fprintf(ssd->statisticfile,"---------------------------statistic data---------------------------\n");
 	fprintf(ssd->statisticfile,"min lsn: %13d\n",ssd->min_lsn);
 	fprintf(ssd->statisticfile,"max lsn: %13d\n",ssd->max_lsn);
-	fprintf(ssd->statisticfile, "the request read hit count: %13lu\n", ssd->req_read_hit_cnt);
+	// fprintf(ssd->statisticfile, "the request read hit count: %13lu\n", ssd->req_read_hit_cnt);
 	fprintf(ssd->statisticfile, "\n");
 
 	fprintf(ssd->statisticfile, "the write operation leaded by pre_process write count: %13lu\n", ssd->pre_all_write);
@@ -658,7 +660,7 @@ void statistic_output(struct ssd_info *ssd)
 
 	fprintf(ssd->statisticfile, "\n");
 	fprintf(ssd->statisticfile, "data read cnt: %13d\n", ssd->data_read_cnt);
-	fprintf(ssd->statisticfile, "user data program: %13d\n", ssd->data_program_cnt);
+	fprintf(ssd->statisticfile, "data program: %13d\n", ssd->data_program_cnt);
 
 	// fprintf(ssd->statisticfile, "\n\n\n");
 	// fprintf(ssd->statisticfile, "\nclose superblock count: %13d\n", ssd->close_superblock_cnt);
@@ -696,10 +698,10 @@ void statistic_output(struct ssd_info *ssd)
 	if (ssd->write_request_count != 0)
 		fprintf(ssd->statisticfile, "write request average response time: %16I64u\n", ssd->write_avg / ssd->write_request_count);
 	fprintf(ssd->statisticfile, "\n");
-	fprintf(ssd->statisticfile,"buffer read hits: %13lu\n",ssd->dram->data_buffer->read_hit);
-	fprintf(ssd->statisticfile,"buffer read miss: %13lu\n",ssd->dram->data_buffer->read_miss_hit);
-	fprintf(ssd->statisticfile,"buffer write hits: %13lu\n",ssd->dram->data_buffer->write_hit);
-	fprintf(ssd->statisticfile,"buffer write miss: %13lu\n",ssd->dram->data_buffer->write_miss_hit);
+	// fprintf(ssd->statisticfile,"buffer read hits: %13lu\n",ssd->dram->data_buffer->read_hit);
+	// fprintf(ssd->statisticfile,"buffer read miss: %13lu\n",ssd->dram->data_buffer->read_miss_hit);
+	// fprintf(ssd->statisticfile,"buffer write hits: %13lu\n",ssd->dram->data_buffer->write_hit);
+	// fprintf(ssd->statisticfile,"buffer write miss: %13lu\n",ssd->dram->data_buffer->write_miss_hit);
 	
 	// fprintf(ssd->statisticfile, "half page read count : %13lu\n", ssd->half_page_read_count);
 	// fprintf(ssd->statisticfile, "mutli plane one shot program count : %13lu\n", ssd->mutliplane_oneshot_prog_count);

@@ -9,5 +9,8 @@ int find_victim_superblock(struct ssd_info *ssd);
 int Get_SB_Invalid(struct ssd_info *ssd, unsigned int sb_no);
 Status Is_Garbage_SBlk(struct ssd_info *ssd, int sb_no);
 int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int victim);
-struct local* find_location_ppn(struct ssd_info* ssd, unsigned int pun);
+Status find_location_ppn(struct ssd_info* ssd, unsigned int ppn, struct local *location);
 int get_free_sb_count(struct ssd_info* ssd);
+
+unsigned int get_new_page(struct ssd_info *ssd);
+Status update_new_page_mapping(struct ssd_info *ssd, unsigned int lpn, unsigned int ppn);
