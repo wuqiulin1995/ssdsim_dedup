@@ -16,7 +16,6 @@ extern int secno_num_per_page, secno_num_sub_page;
 Status invalidate_old_lpn(struct ssd_info* ssd, unsigned int lpn)
 {
 	unsigned int ppn;
-	unsigned int channel, chip, die, plane, block, page;
 	struct local loc;
 
 	ppn = ssd->dram->map->L2P_entry[lpn].pn;
@@ -24,15 +23,13 @@ Status invalidate_old_lpn(struct ssd_info* ssd, unsigned int lpn)
 	if(ppn != INVALID_PPN)
 	{
 		find_location_ppn(ssd, ppn, &loc);
-		channel = loc.channel;
-		chip = loc.chip;
-		die = loc.die;
-		plane = loc.plane;
-		block = loc.block;
-		page = loc.page;
 
-		ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].ref_cnt = 0;
-		ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].invalid_page_num++;
+		decrease_reverse_mapping(ssd, ppn, lpn);
+
+		if(ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].lpn_entry == NULL)
+		{
+			ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].invalid_page_num++;
+		}	
 	}
 
 	return SUCCESS;
@@ -140,15 +137,11 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 {
 	int i, j;
 	unsigned int chan, chip, die, plane, block, page;
-	unsigned int transer = 0;
-	unsigned int lpn, new_ppn = INVALID_PPN, state;
+	unsigned int lpn, old_ppn = INVALID_PPN, new_ppn = INVALID_PPN;
 	__int64 time;
 	unsigned int sum_md;
-	int ref_cnt;
 	struct local loc;
-
-	for (i = 0; i <= secno_num_per_page - 1; i++)
-		state = SET_VALID(state, i);
+	int oob_write = 0;
 
 	sum_md = 0;
 
@@ -160,49 +153,51 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 		{
 			for (chip = 0; chip < ssd->parameter->chip_channel[chan]; chip++)
 			{
-				// ssd->channel_head[chan].chip_head[chip].next_state_predict_time += ssd->parameter->time_characteristics.tR;
-				// transer = 0;
 				for (die = 0; die < ssd->parameter->die_chip; die++)
 				{
 					for (plane = 0; plane < ssd->parameter->plane_die; plane++)
 					{
-						ref_cnt = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].ref_cnt;
-						if (ref_cnt > 0)
+						if(ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn_entry != NULL)
 						{
-							// transer++;
 							sum_md++;
-							lpn = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn;
+							oob_write = 0;
 
-							//set mapping table invalid
-							// ssd->dram->map->L2P_entry[lpn].pn = INVALID_PPN;
-							// insert2_command_buffer(ssd, ssd->dram->data_command_buffer, lpn, state, req);
-
+							old_ppn = find_ppn(ssd, chan, chip, die, plane, block, page);
 							new_ppn = get_new_page(ssd);
-							
+
 							if(new_ppn == INVALID_PPN)
 							{
 								printf("ERROR: get new page fail in GC\n");
 								getchar();
 							}
 
+							find_location_ppn(ssd, new_ppn, &loc);
+
 							ssd_page_read(ssd, chan, chip);
 
 							ssd_page_write(ssd, loc.channel, loc.chip);
 
-							find_location_ppn(ssd, new_ppn, &loc);
+							while(ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn_entry != NULL)
+							{
+								lpn = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn_entry->lpn;		
 
-							invalidate_old_lpn(ssd, lpn);
+								decrease_reverse_mapping(ssd, old_ppn, lpn);
 
-							update_new_page_mapping(ssd, lpn, new_ppn);
-						}
+								update_new_page_mapping(ssd, lpn, new_ppn);
+
+								if(oob_write == 0)
+								{
+									ssd->dram->map->in_nvram[lpn] = 0;
+									oob_write = 1;
+								}
+								else
+								{
+									ssd->dram->map->in_nvram[lpn] = 1;
+								}	
+							}
+						}						
 					}
 				}
-				//transfer req to buffer and hand the request
-				// if (transer > 0)
-				// {
-				// 	time = ssd->channel_head[chan].chip_head[chip].next_state_predict_time + transer * ssd->parameter->page_capacity * ssd->parameter->time_characteristics.tRC;
-				// 	ssd->channel_head[chan].next_state_predict_time = (ssd->channel_head[chan].next_state_predict_time > time) ? time : ssd->channel_head[chan].next_state_predict_time;
-				// }
 			}
 		}
 	}
@@ -388,6 +383,14 @@ unsigned int get_new_page(struct ssd_info *ssd)
 	if (ssd->open_sb->pg_off == ssd->open_sb->blk_cnt - 1)
 		ssd->open_sb->next_wr_page++;
 
+	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].last_write_page++;  //inlitialization is -1
+
+	if (ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].last_write_page != page)
+	{
+		printf("ERROR: last_write_page != page\n");
+		getchar();
+	}
+
 	new_ppn = find_ppn(ssd, channel, chip, die, plane, block, page);
 
 	return new_ppn;
@@ -395,31 +398,90 @@ unsigned int get_new_page(struct ssd_info *ssd)
 
 Status update_new_page_mapping(struct ssd_info *ssd, unsigned int lpn, unsigned int ppn)
 {
-	unsigned int channel, chip, die, plane, block, page;
-	struct local loc;
-
+	increase_reverse_mapping(ssd, ppn, lpn);
 	ssd->dram->map->L2P_entry[lpn].pn = ppn;
+
+	return SUCCESS;
+}
+
+Status increase_reverse_mapping(struct ssd_info *ssd, unsigned int ppn, unsigned int lpn)
+{
+	struct local loc;
+	struct LPN_ENTRY *lpn_entry = NULL;
+
+	lpn_entry = (struct LPN_ENTRY *)malloc(sizeof(struct LPN_ENTRY));
+	alloc_assert(lpn_entry, "lpn_entry");
 	
+	lpn_entry->lpn = lpn;
+	lpn_entry->next = NULL;
+
 	find_location_ppn(ssd, ppn, &loc);
-	channel = loc.channel;
-	chip = loc.chip;
-	die = loc.die;
-	plane = loc.plane;
-	block = loc.block;
-	page = loc.page;
 
-	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].last_write_page++;  //inlitialization is -1
-	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].free_page--;
-	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].free_page_num--;
+	lpn_entry->next = ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].lpn_entry;
+	ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].lpn_entry = lpn_entry;
 
-	if (ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].last_write_page != page)
+	return SUCCESS;
+}
+
+Status decrease_reverse_mapping(struct ssd_info *ssd, unsigned int ppn, unsigned int lpn)
+{
+	struct local loc;
+	struct LPN_ENTRY *del_entry = NULL, *pre_entry = NULL;
+	int ret = FAILURE;
+
+	find_location_ppn(ssd, ppn, &loc);
+
+	del_entry = ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].lpn_entry;
+
+	if(del_entry == NULL)
 	{
-		printf("ERROR: last_write_page != loc.page\n");
+		printf("ERROR: no reverse mapping\n");
 		getchar();
 	}
 
-	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn = lpn;
-	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].ref_cnt = 1;
+	while(del_entry != NULL)
+	{
+		if(del_entry->lpn == lpn)
+		{
+			if(pre_entry == NULL)
+			{
+				if(del_entry->next == NULL)
+				{
+					ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].lpn_entry = NULL;
+				}
+				else
+				{
+					ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].lpn_entry = del_entry->next;
+				}		
+			}
+			else
+			{
+				if(del_entry->next == NULL)
+				{
+					pre_entry->next = NULL;	
+				}
+				else
+				{
+					pre_entry->next = del_entry->next;
+				}
+			}
 
-	return SUCCESS;
+			free(del_entry);
+			del_entry = NULL;
+			
+			ret = SUCCESS;
+			break;
+		}
+
+		pre_entry = del_entry;
+		del_entry = pre_entry->next;
+	}
+
+	if(ret == FAILURE)
+	{
+		printf("ERROR: no reverse mapping\n");
+		getchar();
+	}
+
+	return ret;
 }

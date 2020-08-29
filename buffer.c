@@ -46,30 +46,54 @@ struct ssd_info *handle_new_request(struct ssd_info *ssd)
 
 Status handle_write_request(struct ssd_info *ssd, struct request *req)
 {
-	unsigned int lpn = -1, new_ppn = INVALID_PPN;
+	unsigned int lpn = -1, new_ppn = INVALID_PPN, dup_ppn = INVALID_PPN, fing = 0;
 	struct local loc;
 
 	lpn = req->lsn / secno_num_per_page;
+	fing = req->fing;
 
-	new_ppn = get_new_page(ssd);
-
-	if(new_ppn == INVALID_PPN)
+	if(fing < 1 || fing > UNIQUE_PAGE_NB)
 	{
-		printf("ERROR: get new page fail\n");
+		printf("ERROR: fing = %u\n", fing);
 		getchar();
 	}
 
-	find_location_ppn(ssd, new_ppn, &loc);
+	dup_ppn = ssd->dram->map->F2P_entry[fing].pn;
 
-	req->response_time = ssd_page_write(ssd, loc.channel, loc.chip);
-
-	invalidate_old_lpn(ssd, lpn);
-	
-	update_new_page_mapping(ssd, lpn, new_ppn);
-
-	if(ssd->free_sb_cnt <= MIN_SB_RATE * ssd->sb_cnt)
+	if(dup_ppn != INVALID_PPN)
 	{
-		SuperBlock_GC(ssd, req);
+		invalidate_old_lpn(ssd, lpn);
+
+		update_new_page_mapping(ssd, lpn, dup_ppn);
+		ssd->dram->map->in_nvram[lpn] = 1;
+
+		req->response_time = ssd->current_time + FING_DELAY;
+
+		ssd->reduced_writes++;
+	}
+	else
+	{
+		new_ppn = get_new_page(ssd);
+
+		if(new_ppn == INVALID_PPN)
+		{
+			printf("ERROR: get new page fail\n");
+			getchar();
+		}
+
+		find_location_ppn(ssd, new_ppn, &loc);
+
+		req->response_time = ssd_page_write(ssd, loc.channel, loc.chip) + FING_DELAY;
+
+		invalidate_old_lpn(ssd, lpn);
+		
+		update_new_page_mapping(ssd, lpn, new_ppn);
+		ssd->dram->map->in_nvram[lpn] = 0;
+
+		if(ssd->free_sb_cnt <= MIN_SB_RATE * ssd->sb_cnt)
+		{
+			SuperBlock_GC(ssd, req);
+		}
 	}
 
 	return SUCCESS;

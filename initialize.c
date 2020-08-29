@@ -174,12 +174,13 @@ void initialize_statistic(struct ssd_info * ssd)
 	ssd->one_shot_read_count = 0;
 	ssd->data_read_cnt = 0;
 	ssd->data_program_cnt = 0;
-	ssd->close_superblock_cnt = 0;
-	ssd->reallocate_write_request_cnt = 0;
+
+	ssd->reduced_writes = 0;
 
 	ssd->avg_write_delay_print = 0;
 	ssd->max_write_delay_print = 0;
 	ssd->last_write_avg = 0;
+
 }
 
 struct dram_info * initialize_dram(struct ssd_info * ssd)
@@ -215,6 +216,20 @@ struct dram_info * initialize_dram(struct ssd_info * ssd)
 	for(i = 0; i < page_num; i++)
 	{
 		dram->map->L2P_entry[i].pn = INVALID_PPN;
+	}
+
+	dram->map->in_nvram = (char *)malloc(sizeof(char) * page_num);
+	alloc_assert(dram->map->in_nvram, "dram->map->in_nvram");
+	for(i = 0; i < page_num; i++)
+	{
+		dram->map->in_nvram[i] = -1;
+	}
+
+	dram->map->F2P_entry = (struct FING2PPN*)malloc(sizeof(struct FING2PPN) * (UNIQUE_PAGE_NB + 1));
+	alloc_assert(dram->map->F2P_entry, "dram->map->F2P_entry");
+	for(i = 0; i < UNIQUE_PAGE_NB + 1; i++)
+	{
+		dram->map->F2P_entry[i].pn = INVALID_PPN;
 	}
 
 	//command buffers for user data and mapping data
@@ -405,8 +420,8 @@ int Get_Plane(struct ssd_info * ssd, int i)
 
 struct page_info * initialize_page(struct page_info * p_page )
 {
-	p_page->ref_cnt = -1;
-	p_page->lpn = -1;
+	p_page->fing = 0;
+	p_page->lpn_entry = NULL;
 
 	return p_page;
 }
@@ -416,7 +431,6 @@ struct blk_info * initialize_block(struct blk_info * p_block,struct parameter_va
 	unsigned int i;
 	struct page_info * p_page;
 
-	p_block->free_page_num = parameter->page_block;	// all pages are free
 	p_block->last_write_page = -1;	// no page has been programmed
 
 	p_block->page_head = (struct page_info *)malloc(parameter->page_block * sizeof(struct page_info));
@@ -437,7 +451,6 @@ struct plane_info * initialize_plane(struct plane_info * p_plane,struct paramete
 {
 	unsigned int i;
 	struct blk_info * p_block;
-	p_plane->free_page=parameter->block_plane*parameter->page_block;
 
 	p_plane->blk_head = (struct blk_info *)malloc(parameter->block_plane * sizeof(struct blk_info));
 	alloc_assert(p_plane->blk_head,"p_plane->blk_head");
@@ -455,8 +468,6 @@ struct die_info * initialize_die(struct die_info * p_die,struct parameter_value 
 {
 	unsigned int i;
 	struct plane_info * p_plane;
-
-	p_die->read_cnt = 0;
 
 	p_die->plane_head = (struct plane_info*)malloc(parameter->plane_die * sizeof(struct plane_info));
 	alloc_assert(p_die->plane_head,"p_die->plane_head");

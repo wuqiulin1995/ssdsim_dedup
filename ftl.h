@@ -15,3 +15,6 @@ Status find_location_ppn(struct ssd_info* ssd, unsigned int ppn, struct local *l
 unsigned int get_new_page(struct ssd_info *ssd);
 Status invalidate_old_lpn(struct ssd_info* ssd,unsigned int lpn);
 Status update_new_page_mapping(struct ssd_info *ssd, unsigned int lpn, unsigned int ppn);
+
+Status increase_reverse_mapping(struct ssd_info *ssd, unsigned int ppn, unsigned int lpn);
+Status decrease_reverse_mapping(struct ssd_info *ssd, unsigned int ppn, unsigned int lpn);

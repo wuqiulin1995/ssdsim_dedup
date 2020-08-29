@@ -8,6 +8,7 @@
 #include "avlTree.h"
 
 #define UNIQUE_PAGE_NB 1000000 // fing [1, UNIQUE_PAGE_NB]
+#define FING_DELAY 32000 // fing compare delay, 32 us
 
 #define SECTOR 512
 #define BUFSIZE 200
@@ -286,10 +287,10 @@ struct ssd_info{
 
 	unsigned int data_read_cnt;
 	unsigned int data_program_cnt;
-	unsigned int close_superblock_cnt;
-	unsigned int reallocate_write_request_cnt;
 
 	unsigned int process_enhancement;
+
+	unsigned int reduced_writes;
 
 	long long avg_write_delay_print; // write_request_count % 10000 = 1 ���һ�Σ��������0
 	long long max_write_delay_print;
@@ -329,28 +330,23 @@ struct chip_info{
 
 
 struct die_info{
-	unsigned int read_cnt;
 	struct plane_info *plane_head;
 };
 
 struct plane_info{
-	unsigned int free_page;             //the number of free page in plane
-
 	struct blk_info *blk_head;
 };
 
 
 struct blk_info{
-	unsigned int free_page_num;        //Record the number of pages in the block
 	unsigned int invalid_page_num;     //Record the number of invaild pages in the block
-
 	int last_write_page;               //Records the number of pages executed by the last write operation, and -1 indicates that no page has been written
 	struct page_info *page_head; 
 };
 
-struct page_info{         
-	int ref_cnt;                   //indicate the page is valid or invalid, -1: init, 0: invalid, >0: ref_cnt
-	unsigned int lpn;
+struct page_info{
+	unsigned int fing;
+	struct LPN_ENTRY *lpn_entry;
 };
 
 struct super_block_info{
@@ -408,6 +404,8 @@ struct dram_parameter{
 
 struct map_info{
 	struct LPN2PPN *L2P_entry;
+	char *in_nvram;
+	struct FING2PPN *F2P_entry;
 };
 
 struct controller_info{
@@ -533,6 +531,15 @@ struct parameter_value{
 *********************************************************/
 struct LPN2PPN{
 	unsigned int pn;                //Physical number, either a physical page number, a physical subpage number, or a physical block number
+};
+
+struct FING2PPN{
+	unsigned int pn;
+};
+
+struct LPN_ENTRY{
+	unsigned int lpn;
+	struct LPN_ENTRY *next;
 };
 
 struct local{          
