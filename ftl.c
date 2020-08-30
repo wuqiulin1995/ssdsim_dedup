@@ -16,7 +16,6 @@ extern int secno_num_per_page, secno_num_sub_page;
 Status invalidate_old_lpn(struct ssd_info* ssd, unsigned int lpn)
 {
 	unsigned int ppn;
-	unsigned int channel, chip, die, plane, block, page;
 	struct local loc;
 
 	ppn = ssd->dram->map->L2P_entry[lpn].pn;
@@ -24,15 +23,9 @@ Status invalidate_old_lpn(struct ssd_info* ssd, unsigned int lpn)
 	if(ppn != INVALID_PPN)
 	{
 		find_location_ppn(ssd, ppn, &loc);
-		channel = loc.channel;
-		chip = loc.chip;
-		die = loc.die;
-		plane = loc.plane;
-		block = loc.block;
-		page = loc.page;
 
-		ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].ref_cnt = 0;
-		ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].invalid_page_num++;
+		ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].ref_cnt = 0;
+		ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].invalid_page_num++;
 	}
 
 	return SUCCESS;
@@ -140,15 +133,11 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 {
 	int i, j;
 	unsigned int chan, chip, die, plane, block, page;
-	unsigned int transer = 0;
-	unsigned int lpn, new_ppn = INVALID_PPN, state;
+	unsigned int lpn, new_ppn = INVALID_PPN;
 	__int64 time;
 	unsigned int sum_md;
 	int ref_cnt;
 	struct local loc;
-
-	for (i = 0; i <= secno_num_per_page - 1; i++)
-		state = SET_VALID(state, i);
 
 	sum_md = 0;
 
@@ -160,8 +149,6 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 		{
 			for (chip = 0; chip < ssd->parameter->chip_channel[chan]; chip++)
 			{
-				// ssd->channel_head[chan].chip_head[chip].next_state_predict_time += ssd->parameter->time_characteristics.tR;
-				// transer = 0;
 				for (die = 0; die < ssd->parameter->die_chip; die++)
 				{
 					for (plane = 0; plane < ssd->parameter->plane_die; plane++)
@@ -169,13 +156,8 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 						ref_cnt = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].ref_cnt;
 						if (ref_cnt > 0)
 						{
-							// transer++;
 							sum_md++;
 							lpn = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn;
-
-							//set mapping table invalid
-							// ssd->dram->map->L2P_entry[lpn].pn = INVALID_PPN;
-							// insert2_command_buffer(ssd, ssd->dram->data_command_buffer, lpn, state, req);
 
 							new_ppn = get_new_page(ssd);
 							
@@ -185,11 +167,11 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 								getchar();
 							}
 
+							find_location_ppn(ssd, new_ppn, &loc);
+
 							ssd_page_read(ssd, chan, chip);
 
 							ssd_page_write(ssd, loc.channel, loc.chip);
-
-							find_location_ppn(ssd, new_ppn, &loc);
 
 							invalidate_old_lpn(ssd, lpn);
 
@@ -197,12 +179,6 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 						}
 					}
 				}
-				//transfer req to buffer and hand the request
-				// if (transer > 0)
-				// {
-				// 	time = ssd->channel_head[chan].chip_head[chip].next_state_predict_time + transer * ssd->parameter->page_capacity * ssd->parameter->time_characteristics.tRC;
-				// 	ssd->channel_head[chan].next_state_predict_time = (ssd->channel_head[chan].next_state_predict_time > time) ? time : ssd->channel_head[chan].next_state_predict_time;
-				// }
 			}
 		}
 	}
@@ -388,6 +364,14 @@ unsigned int get_new_page(struct ssd_info *ssd)
 	if (ssd->open_sb->pg_off == ssd->open_sb->blk_cnt - 1)
 		ssd->open_sb->next_wr_page++;
 
+	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].last_write_page++;  //inlitialization is -1
+
+	if (ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].last_write_page != page)
+	{
+		printf("ERROR: last_write_page != page\n");
+		getchar();
+	}
+
 	new_ppn = find_ppn(ssd, channel, chip, die, plane, block, page);
 
 	return new_ppn;
@@ -395,31 +379,14 @@ unsigned int get_new_page(struct ssd_info *ssd)
 
 Status update_new_page_mapping(struct ssd_info *ssd, unsigned int lpn, unsigned int ppn)
 {
-	unsigned int channel, chip, die, plane, block, page;
 	struct local loc;
-
-	ssd->dram->map->L2P_entry[lpn].pn = ppn;
 	
 	find_location_ppn(ssd, ppn, &loc);
-	channel = loc.channel;
-	chip = loc.chip;
-	die = loc.die;
-	plane = loc.plane;
-	block = loc.block;
-	page = loc.page;
 
-	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].last_write_page++;  //inlitialization is -1
-	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].free_page--;
-	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].free_page_num--;
+	ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].lpn = lpn;
+	ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].ref_cnt = 1;
 
-	if (ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].last_write_page != page)
-	{
-		printf("ERROR: last_write_page != loc.page\n");
-		getchar();
-	}
-
-	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn = lpn;
-	ssd->channel_head[channel].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].ref_cnt = 1;
+	ssd->dram->map->L2P_entry[lpn].pn = ppn;
 
 	return SUCCESS;
 }

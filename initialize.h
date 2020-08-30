@@ -286,8 +286,6 @@ struct ssd_info{
 
 	unsigned int data_read_cnt;
 	unsigned int data_program_cnt;
-	unsigned int close_superblock_cnt;
-	unsigned int reallocate_write_request_cnt;
 
 	unsigned int process_enhancement;
 
@@ -329,21 +327,16 @@ struct chip_info{
 
 
 struct die_info{
-	unsigned int read_cnt;
 	struct plane_info *plane_head;
 };
 
 struct plane_info{
-	unsigned int free_page;             //the number of free page in plane
-
 	struct blk_info *blk_head;
 };
 
 
 struct blk_info{
-	unsigned int free_page_num;        //Record the number of pages in the block
 	unsigned int invalid_page_num;     //Record the number of invaild pages in the block
-
 	int last_write_page;               //Records the number of pages executed by the last write operation, and -1 indicates that no page has been written
 	struct page_info *page_head; 
 };
