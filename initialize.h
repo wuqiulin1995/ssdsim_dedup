@@ -297,6 +297,7 @@ struct ssd_info{
 	unsigned int process_enhancement;
 
 	unsigned int reduced_writes;
+	unsigned int use_remap_fail;
 	unsigned int total_oob_entry;
 	unsigned int invalid_oob_entry;
 	// unsigned int max_ref;

@@ -142,7 +142,7 @@ struct ssd_info *initiation(struct ssd_info *ssd)
 		return NULL;
 	}
 
-	fprintf(ssd->stat_file, "write request, total oob entry, invalid entry, avg write delay print, max write delay print, nvram gc, avg nvram gc delay, gc scan nvram, avg scan nvram delay\n");
+	fprintf(ssd->stat_file, "write request, total oob entry, invalid entry, avg write delay print, max write delay print, nvram gc, avg nvram gc delay, gc scan nvram, avg scan nvram delay, use remap fail\n");
 	fflush(ssd->stat_file);
 
 	printf("\n initiation is completed!\n");
@@ -185,6 +185,7 @@ void initialize_statistic(struct ssd_info * ssd)
 	ssd->data_program_cnt = 0;
 
 	ssd->reduced_writes = 0;
+	ssd->use_remap_fail = 0;
 
 	ssd->avg_write_delay_print = 0;
 	ssd->max_write_delay_print = 0;

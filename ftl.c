@@ -222,7 +222,12 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 									getchar();
 								}
 
-								invalidate_old_lpn(ssd, lpn);
+								decrease_reverse_mapping(ssd, old_ppn, lpn);
+								if(ssd->dram->map->in_nvram[lpn] == 1)
+								{
+									ssd->nvram_log->invalid_entry++;
+									ssd->invalid_oob_entry++;
+								}
 
 								update_new_page_mapping(ssd, lpn, new_ppn);
 
@@ -601,7 +606,10 @@ Status use_remap(struct ssd_info *ssd)
 			invalid_ratio = (float)(ssd->invalid_oob_entry) / ssd->total_oob_entry;
 
 		if(ssd->total_oob_entry >= MAX_OOB_ENTRY && invalid_ratio <= INVALID_ENTRY_THRE)
+		{
+			ssd->use_remap_fail++;
 			return FAILURE;
+		}
 
 		if(ssd->total_oob_entry >= MAX_OOB_ENTRY && invalid_ratio > INVALID_ENTRY_THRE)
 		{
@@ -611,5 +619,6 @@ Status use_remap(struct ssd_info *ssd)
 
 	}while(count <= 2);
 
+	ssd->use_remap_fail++;
 	return FAILURE;
 }
