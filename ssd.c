@@ -75,8 +75,14 @@ void tracefile_sim(struct ssd_info *ssd)
 
 void reset(struct ssd_info *ssd)
 {
-	unsigned int i, j;
+	int i, j, sb_num;
 	initialize_statistic(ssd);
+
+	sb_num = ssd->parameter->block_plane;
+	for(i = 0; i < sb_num; i++)
+	{
+		ssd->nvram_seg[i].next_avail_time = 0;
+	}
 
 	//reset the time 
 	ssd->current_time = 0;
@@ -111,6 +117,7 @@ struct ssd_info *warm_flash(struct ssd_info *ssd)
 	if ((err = fopen_s(&(ssd->tracefile), ssd->tracefilename, "rb")) != 0)
 	{
 		printf("the trace file can't open\n");
+		getchar();
 		return NULL;
 	}
 
@@ -163,6 +170,7 @@ struct ssd_info *simulate(struct ssd_info *ssd)
 	if((err=fopen_s(&(ssd->tracefile),ssd->tracefilename,"rb"))!=0)
 	{  
 		printf("the trace file can't open\n");
+		getchar();
 		return NULL;
 	}
 
@@ -247,16 +255,29 @@ void trace_output(struct ssd_info *ssd)
 				if(req->response_time - req->time > ssd->max_write_delay_print)
 					ssd->max_write_delay_print = req->response_time - req->time;
 
-				if(ssd->warm_flash_cmplt == 1 && ssd->write_request_count > 1 && ssd->write_request_count % 10000 == 1)
+				if(ssd->warm_flash_cmplt == 1 && ssd->write_request_count > 1 && ssd->write_request_count % 50000 == 1)
 				{
-					ssd->avg_write_delay_print = (ssd->write_avg - ssd->last_write_avg) / 10000;
+					ssd->avg_write_delay_print = (ssd->write_avg - ssd->last_write_avg) / 50000;
 					ssd->last_write_avg = ssd->write_avg;
 
-					fprintf(ssd->stat_file, "%lld, %lld\n", ssd->avg_write_delay_print, ssd->max_write_delay_print);
+					fprintf(ssd->stat_file, "%lu, %u, %u, %u, %u, %u, %lld, %lld, %u, %lld, %u, %lld, %u\n", 
+											ssd->write_request_count, ssd->total_alloc_seg, ssd->min_alloc_seg, ssd->max_alloc_seg, 
+											ssd->total_oob_entry, ssd->invalid_oob_entry,
+											ssd->avg_write_delay_print, ssd->max_write_delay_print, 
+											ssd->nvram_gc_print, ssd->avg_nvram_gc_delay, 
+											ssd->gcr_nvram_print, ssd->avg_gcr_nvram_delay, ssd->use_remap_fail);
 					fflush(ssd->stat_file);
 
 					ssd->avg_write_delay_print = 0;
 					ssd->max_write_delay_print = 0;
+
+					ssd->nvram_gc_print = 0;
+					ssd->nvram_gc_delay_print = 0;
+					ssd->avg_nvram_gc_delay = 0;
+
+					ssd->gcr_nvram_print = 0;
+					ssd->gcr_nvram_delay_print = 0;
+					ssd->avg_gcr_nvram_delay = 0;
 				}
 			}
 

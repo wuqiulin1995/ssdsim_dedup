@@ -29,7 +29,13 @@ Status invalidate_old_lpn(struct ssd_info* ssd, unsigned int lpn)
 		if(ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].lpn_entry == NULL)
 		{
 			ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].invalid_page_num++;
-		}	
+		}
+
+		if(ssd->dram->map->in_nvram[lpn] == 1)
+		{
+			ssd->nvram_seg[loc.block].invalid_entry++;
+			ssd->invalid_oob_entry++;
+		}
 	}
 
 	return SUCCESS;
@@ -137,11 +143,30 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 {
 	int i, j;
 	unsigned int chan, chip, die, plane, block, page;
-	unsigned int lpn, old_ppn = INVALID_PPN, new_ppn = INVALID_PPN;
+	unsigned int lpn, old_ppn = INVALID_PPN, new_ppn = INVALID_PPN, fing = 0;
 	__int64 time;
 	unsigned int sum_md;
 	struct local loc;
 	int oob_write = 0;
+	int entry_nb = 0;
+	__int64 nvram_read_time = 0, nvram_avail_ts = 0;
+
+	entry_nb = ssd->nvram_seg[victim].alloc_seg * OOB_ENTRY_PER_SEG - ssd->nvram_seg[victim].free_entry;
+	if(entry_nb > 0)
+	{
+		nvram_read_time = (__int64)entry_nb * OOB_ENTRY_BYTES / 64 * NVRAM_READ_DELAY;
+		nvram_avail_ts = update_nvram_ts(ssd, victim, nvram_read_time);
+	}
+
+	if(nvram_avail_ts > 0)
+	{
+		update_flash_ts(ssd, nvram_avail_ts);
+		update_nvram_oob(ssd, victim, 0);
+
+		ssd->gcr_nvram_print++;
+		ssd->gcr_nvram_delay_print += nvram_read_time;
+		ssd->avg_gcr_nvram_delay = ssd->gcr_nvram_delay_print / ssd->gcr_nvram_print;
+	}
 
 	sum_md = 0;
 
@@ -162,6 +187,14 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 							sum_md++;
 							oob_write = 0;
 
+							fing = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].fing;
+
+							if(fing < 1 || fing > UNIQUE_PAGE_NB)
+							{
+								printf("ERROR: fing < 1 || fing > UNIQUE_PAGE_NB, %d\n", fing);
+								getchar();
+							}
+
 							old_ppn = find_ppn(ssd, chan, chip, die, plane, block, page);
 							new_ppn = get_new_page(ssd);
 
@@ -177,9 +210,18 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 
 							ssd_page_write(ssd, loc.channel, loc.chip);
 
+							ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].fing = fing;
+							ssd->dram->map->F2P_entry[fing].pn = new_ppn;
+
 							while(ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn_entry != NULL)
 							{
-								lpn = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn_entry->lpn;		
+								lpn = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn_entry->lpn;
+
+								if(ssd->dram->map->L2P_entry[lpn].pn != old_ppn)
+								{
+									printf("ERROR: ssd->dram->map->L2P_entry[lpn].pn != old_ppn\n");
+									getchar();
+								}
 
 								decrease_reverse_mapping(ssd, old_ppn, lpn);
 
@@ -192,6 +234,7 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 								}
 								else
 								{
+									update_nvram_oob(ssd, loc.block, 1);
 									ssd->dram->map->in_nvram[lpn] = 1;
 								}	
 							}
@@ -484,4 +527,138 @@ Status decrease_reverse_mapping(struct ssd_info *ssd, unsigned int ppn, unsigned
 	}
 
 	return ret;
+}
+
+Status update_nvram_oob(struct ssd_info *ssd, unsigned int block, int type)
+{
+	int entry_nb = 0;
+
+	if(type == 1)
+	{
+		if(ssd->nvram_seg[block].free_entry == 0)
+		{
+			ssd->nvram_seg[block].alloc_seg++;
+			ssd->nvram_seg[block].free_entry = OOB_ENTRY_PER_SEG;
+
+			if(ssd->nvram_seg[block].alloc_seg > ssd->max_alloc_seg)
+				ssd->max_alloc_seg = ssd->nvram_seg[block].alloc_seg;
+
+			ssd->total_alloc_seg++;
+		}
+
+		ssd->nvram_seg[block].free_entry--;
+		ssd->total_oob_entry++;
+
+		if(ssd->total_alloc_seg > MAX_OOB_SEG)
+			printf("ERROR: ssd->total_alloc_seg > MAX_OOB_SEG\n");
+	}
+	else if(type == 0)
+	{
+		entry_nb = ssd->nvram_seg[block].alloc_seg * OOB_ENTRY_PER_SEG - ssd->nvram_seg[block].free_entry;
+
+		if(ssd->nvram_seg[block].alloc_seg < ssd->min_alloc_seg)
+			ssd->min_alloc_seg = ssd->nvram_seg[block].alloc_seg;
+
+		ssd->total_alloc_seg -= ssd->nvram_seg[block].alloc_seg;
+		ssd->total_oob_entry -= entry_nb;
+		ssd->invalid_oob_entry -= ssd->nvram_seg[block].invalid_entry;
+		
+		ssd->nvram_seg[block].alloc_seg = 0;
+		ssd->nvram_seg[block].free_entry = 0;
+		ssd->nvram_seg[block].invalid_entry = 0;
+	}
+	else
+	{
+		printf("ERROR: invalid update nvram oob type\n");
+	}
+	
+	return SUCCESS;
+}
+
+Status nvram_oob_gc(struct ssd_info *ssd)
+{
+	int max_invalid_entry = 0, entry_nb = 0, valid_entry = 0, victim_seg = -1, i = 0, sb_num = 0;
+	__int64 nvram_oob_rw_time = 0;
+
+	sb_num = ssd->parameter->block_plane;
+
+	for(i = 0; i < sb_num; i++)
+	{
+		if(ssd->nvram_seg[i].invalid_entry > max_invalid_entry)
+		{
+			max_invalid_entry = ssd->nvram_seg[i].invalid_entry;
+			victim_seg = i;
+		}
+	}
+
+	if(victim_seg == -1)
+	{
+		printf("ERROR: no victim segment to gc\n");
+		getchar();
+	}
+
+	entry_nb = ssd->nvram_seg[victim_seg].alloc_seg * OOB_ENTRY_PER_SEG - ssd->nvram_seg[victim_seg].free_entry;
+	valid_entry = entry_nb - ssd->nvram_seg[victim_seg].invalid_entry;
+
+	update_nvram_oob(ssd, victim_seg, 0);
+
+	for(i = 0; i < valid_entry; i++)
+	{
+		if(ssd->nvram_seg[victim_seg].free_entry == 0)
+		{
+			ssd->nvram_seg[victim_seg].alloc_seg++;
+			ssd->nvram_seg[victim_seg].free_entry = OOB_ENTRY_PER_SEG;
+
+			if(ssd->nvram_seg[victim_seg].alloc_seg > ssd->max_alloc_seg)
+				ssd->max_alloc_seg = ssd->nvram_seg[victim_seg].alloc_seg;
+
+			ssd->total_alloc_seg++;
+		}
+
+		ssd->nvram_seg[victim_seg].free_entry--;
+		ssd->total_oob_entry++;
+	}
+
+	nvram_oob_rw_time = (__int64)entry_nb * OOB_ENTRY_BYTES / 64 * NVRAM_READ_DELAY + (__int64)valid_entry * OOB_ENTRY_BYTES / 64 * NVRAM_WRITE_DELAY;
+
+	update_nvram_ts(ssd, victim_seg, nvram_oob_rw_time);
+
+	ssd->nvram_gc_print++;
+	ssd->nvram_gc_delay_print += nvram_oob_rw_time;
+	ssd->avg_nvram_gc_delay = ssd->nvram_gc_delay_print / ssd->nvram_gc_print;
+
+	return SUCCESS;
+}
+
+Status use_remap(struct ssd_info *ssd, unsigned int block)
+{
+	int count = 0;
+	float invalid_ratio = 0.0;
+
+	do{
+		if(ssd->nvram_seg[block].free_entry > 0)
+			return SUCCESS;
+
+		if(ssd->total_alloc_seg < MAX_OOB_SEG)
+			return SUCCESS;
+
+		if(ssd->total_oob_entry > 0)
+			invalid_ratio = (float)(ssd->invalid_oob_entry) / ssd->total_oob_entry;
+
+		if(ssd->total_alloc_seg >= MAX_OOB_SEG && invalid_ratio <= INVALID_ENTRY_THRE)
+		{
+			ssd->use_remap_fail++;
+			return FAILURE;
+		}
+
+		if(ssd->total_alloc_seg >= MAX_OOB_SEG && invalid_ratio > INVALID_ENTRY_THRE)
+		{
+			nvram_oob_gc(ssd);
+			count++;
+		}
+
+	}while(count <= ssd->parameter->block_plane);
+
+	ssd->use_remap_fail++;
+	return FAILURE;
 }

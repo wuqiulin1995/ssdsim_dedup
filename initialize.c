@@ -56,6 +56,7 @@ struct ssd_info *initiation(struct ssd_info *ssd)
 	char buffer[300];
 	struct parameter_value *parameters;
 	FILE *fp=NULL;
+	int i = 0, sb_num = 0;
 	
 	//Import the configuration file for ssd
 	parameters=load_parameters(ssd->parameterfilename);
@@ -75,6 +76,24 @@ struct ssd_info *initiation(struct ssd_info *ssd)
 
     //initialize the superblock info 
 	intialize_sb(ssd);
+
+	sb_num = ssd->parameter->block_plane;
+
+	ssd->nvram_seg = (struct NVRAM_OOB_SEG *)malloc(sizeof(struct NVRAM_OOB_SEG)*sb_num);
+	alloc_assert(ssd->nvram_seg, "ssd->nvram_seg");
+	for(i = 0; i < sb_num; i++)
+	{
+		ssd->nvram_seg[i].next_avail_time = 0;
+		ssd->nvram_seg[i].alloc_seg = 0;
+		ssd->nvram_seg[i].free_entry = 0;
+		ssd->nvram_seg[i].invalid_entry = 0;
+	}
+	ssd->total_oob_entry = 0;
+	ssd->invalid_oob_entry = 0;
+	ssd->total_alloc_seg = 0;
+	ssd->max_alloc_seg = 0;
+	ssd->min_alloc_seg = 100;
+	// ssd->max_ref = 0;
 
 	//Initialize dram_info
 	ssd->dram = (struct dram_info *)malloc(sizeof(struct dram_info));
@@ -133,7 +152,7 @@ struct ssd_info *initiation(struct ssd_info *ssd)
 		return NULL;
 	}
 
-	fprintf(ssd->stat_file, "avg write delay print, max write delay print\n");
+	fprintf(ssd->stat_file, "write request, total alloc seg, min alloc seg, max alloc seg, total oob entry, invalid entry, avg write delay print, max write delay print, nvram gc, avg nvram gc delay, gc scan nvram, avg scan nvram delay, use remap fail\n");
 	fflush(ssd->stat_file);
 
 	printf("\n initiation is completed!\n");
@@ -176,11 +195,19 @@ void initialize_statistic(struct ssd_info * ssd)
 	ssd->data_program_cnt = 0;
 
 	ssd->reduced_writes = 0;
+	ssd->use_remap_fail = 0;
 
 	ssd->avg_write_delay_print = 0;
 	ssd->max_write_delay_print = 0;
 	ssd->last_write_avg = 0;
 
+	ssd->nvram_gc_print = 0;
+	ssd->nvram_gc_delay_print = 0;
+	ssd->avg_nvram_gc_delay = 0;
+
+	ssd->gcr_nvram_print = 0;
+	ssd->gcr_nvram_delay_print = 0;
+	ssd->avg_gcr_nvram_delay = 0;
 }
 
 struct dram_info * initialize_dram(struct ssd_info * ssd)

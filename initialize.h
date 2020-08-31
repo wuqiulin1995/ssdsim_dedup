@@ -8,7 +8,14 @@
 #include "avlTree.h"
 
 #define UNIQUE_PAGE_NB 1000000 // fing [1, UNIQUE_PAGE_NB]
-#define FING_DELAY 32000 // fing compare delay, 32 us
+#define FING_DELAY 32000 // fing compare delay, 32us
+// #define MAX_OOB_ENTRY 1000000
+#define MAX_OOB_SEG 102400 // 100M
+#define OOB_ENTRY_PER_SEG 64 // 1KB seg
+#define OOB_ENTRY_BYTES 16
+#define NVRAM_READ_DELAY 50 // 50ns for PCM 64 byte
+#define NVRAM_WRITE_DELAY 500 // 500ns for PCM 64 byte
+#define INVALID_ENTRY_THRE 0.05
 
 #define SECTOR 512
 #define BUFSIZE 200
@@ -274,6 +281,7 @@ struct ssd_info{
 	FILE *statisticfile;
 
 	FILE *stat_file;
+	struct NVRAM_OOB_SEG *nvram_seg;
 
     struct parameter_value *parameter;   //SSD parameter
 	struct dram_info *dram;
@@ -291,10 +299,25 @@ struct ssd_info{
 	unsigned int process_enhancement;
 
 	unsigned int reduced_writes;
+	unsigned int use_remap_fail;
+	unsigned int total_oob_entry;
+	unsigned int invalid_oob_entry;
+	unsigned int total_alloc_seg;
+	unsigned int max_alloc_seg;
+	unsigned int min_alloc_seg;
+	// unsigned int max_ref;
 
-	long long avg_write_delay_print; // write_request_count % 10000 = 1 ���һ�Σ��������0
+	long long avg_write_delay_print; // write_request_count % 10000 = 1
 	long long max_write_delay_print;
 	long long last_write_avg;
+
+	unsigned int nvram_gc_print;
+	long long nvram_gc_delay_print;
+	long long avg_nvram_gc_delay;
+
+	unsigned int gcr_nvram_print;
+	long long gcr_nvram_delay_print;
+	long long avg_gcr_nvram_delay;
 };
 
 
@@ -540,6 +563,13 @@ struct FING2PPN{
 struct LPN_ENTRY{
 	unsigned int lpn;
 	struct LPN_ENTRY *next;
+};
+
+struct NVRAM_OOB_SEG{
+	__int64 next_avail_time;
+	int alloc_seg;
+	int free_entry;
+	int invalid_entry;
 };
 
 struct local{          
