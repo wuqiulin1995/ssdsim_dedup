@@ -133,7 +133,7 @@ struct ssd_info *initiation(struct ssd_info *ssd)
 		return NULL;
 	}
 
-	fprintf(ssd->stat_file, "avg write delay print, max write delay print\n");
+	fprintf(ssd->stat_file, "write request, avg write delay print, max write delay print\n");
 	fflush(ssd->stat_file);
 
 	printf("\n initiation is completed!\n");

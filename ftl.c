@@ -137,7 +137,7 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 {
 	int i, j;
 	unsigned int chan, chip, die, plane, block, page;
-	unsigned int lpn, old_ppn = INVALID_PPN, new_ppn = INVALID_PPN;
+	unsigned int lpn, old_ppn = INVALID_PPN, new_ppn = INVALID_PPN, fing = 0;
 	__int64 time;
 	unsigned int sum_md;
 	struct local loc;
@@ -162,6 +162,14 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 							sum_md++;
 							oob_write = 0;
 
+							fing = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].fing;
+
+							if(fing < 1 || fing > UNIQUE_PAGE_NB)
+							{
+								printf("ERROR: fing < 1 || fing > UNIQUE_PAGE_NB, %d\n", fing);
+								getchar();
+							}
+
 							old_ppn = find_ppn(ssd, chan, chip, die, plane, block, page);
 							new_ppn = get_new_page(ssd);
 
@@ -177,11 +185,20 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 
 							ssd_page_write(ssd, loc.channel, loc.chip);
 
+							ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].fing = fing;
+							ssd->dram->map->F2P_entry[fing].pn = new_ppn;
+
 							while(ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn_entry != NULL)
 							{
 								lpn = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn_entry->lpn;		
 
-								decrease_reverse_mapping(ssd, old_ppn, lpn);
+								if(ssd->dram->map->L2P_entry[lpn].pn != old_ppn)
+								{
+									printf("ERROR: ssd->dram->map->L2P_entry[lpn].pn != old_ppn\n");
+									getchar();
+								}
+
+								invalidate_old_lpn(ssd, lpn);
 
 								update_new_page_mapping(ssd, lpn, new_ppn);
 

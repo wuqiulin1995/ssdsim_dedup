@@ -111,6 +111,7 @@ struct ssd_info *warm_flash(struct ssd_info *ssd)
 	if ((err = fopen_s(&(ssd->tracefile), ssd->tracefilename, "rb")) != 0)
 	{
 		printf("the trace file can't open\n");
+		getchar();
 		return NULL;
 	}
 
@@ -163,6 +164,7 @@ struct ssd_info *simulate(struct ssd_info *ssd)
 	if((err=fopen_s(&(ssd->tracefile),ssd->tracefilename,"rb"))!=0)
 	{  
 		printf("the trace file can't open\n");
+		getchar();
 		return NULL;
 	}
 
@@ -247,12 +249,12 @@ void trace_output(struct ssd_info *ssd)
 				if(req->response_time - req->time > ssd->max_write_delay_print)
 					ssd->max_write_delay_print = req->response_time - req->time;
 
-				if(ssd->warm_flash_cmplt == 1 && ssd->write_request_count > 1 && ssd->write_request_count % 10000 == 1)
+				if(ssd->warm_flash_cmplt == 1 && ssd->write_request_count > 1 && ssd->write_request_count % 50000 == 1)
 				{
-					ssd->avg_write_delay_print = (ssd->write_avg - ssd->last_write_avg) / 10000;
+					ssd->avg_write_delay_print = (ssd->write_avg - ssd->last_write_avg) / 50000;
 					ssd->last_write_avg = ssd->write_avg;
 
-					fprintf(ssd->stat_file, "%lld, %lld\n", ssd->avg_write_delay_print, ssd->max_write_delay_print);
+					fprintf(ssd->stat_file, "%lu, %lld, %lld\n", ssd->write_request_count, ssd->avg_write_delay_print, ssd->max_write_delay_print);
 					fflush(ssd->stat_file);
 
 					ssd->avg_write_delay_print = 0;
