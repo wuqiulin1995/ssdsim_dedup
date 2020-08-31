@@ -18,3 +18,7 @@ Status update_new_page_mapping(struct ssd_info *ssd, unsigned int lpn, unsigned 
 
 Status increase_reverse_mapping(struct ssd_info *ssd, unsigned int ppn, unsigned int lpn);
 Status decrease_reverse_mapping(struct ssd_info *ssd, unsigned int ppn, unsigned int lpn);
+
+Status update_nvram_oob(struct ssd_info *ssd, int type);
+Status nvram_oob_gc(struct ssd_info *ssd);
+Status use_remap(struct ssd_info *ssd);

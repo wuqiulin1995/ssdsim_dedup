@@ -78,6 +78,8 @@ void reset(struct ssd_info *ssd)
 	unsigned int i, j;
 	initialize_statistic(ssd);
 
+	ssd->nvram_log->next_avail_time = 0;
+
 	//reset the time 
 	ssd->current_time = 0;
 	for (i = 0; i < ssd->parameter->channel_number; i++)
@@ -247,16 +249,28 @@ void trace_output(struct ssd_info *ssd)
 				if(req->response_time - req->time > ssd->max_write_delay_print)
 					ssd->max_write_delay_print = req->response_time - req->time;
 
-				if(ssd->warm_flash_cmplt == 1 && ssd->write_request_count > 1 && ssd->write_request_count % 10000 == 1)
+				if(ssd->warm_flash_cmplt == 1 && ssd->write_request_count > 1 && ssd->write_request_count % 50000 == 1)
 				{
-					ssd->avg_write_delay_print = (ssd->write_avg - ssd->last_write_avg) / 10000;
+					ssd->avg_write_delay_print = (ssd->write_avg - ssd->last_write_avg) / 50000;
 					ssd->last_write_avg = ssd->write_avg;
 
-					fprintf(ssd->stat_file, "%lld, %lld\n", ssd->avg_write_delay_print, ssd->max_write_delay_print);
+					fprintf(ssd->stat_file, "%lu, %u, %u, %lld, %lld, %u, %lld, %u, %lld\n", 
+											ssd->write_request_count, ssd->total_oob_entry, ssd->invalid_oob_entry,
+											ssd->avg_write_delay_print, ssd->max_write_delay_print, 
+											ssd->nvram_gc_print, ssd->avg_nvram_gc_delay, 
+											ssd->gcr_nvram_print, ssd->avg_gcr_nvram_delay);
 					fflush(ssd->stat_file);
 
 					ssd->avg_write_delay_print = 0;
 					ssd->max_write_delay_print = 0;
+
+					ssd->nvram_gc_print = 0;
+					ssd->nvram_gc_delay_print = 0;
+					ssd->avg_nvram_gc_delay = 0;
+
+					ssd->gcr_nvram_print = 0;
+					ssd->gcr_nvram_delay_print = 0;
+					ssd->avg_gcr_nvram_delay = 0;
 				}
 			}
 

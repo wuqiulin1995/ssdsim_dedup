@@ -76,6 +76,15 @@ struct ssd_info *initiation(struct ssd_info *ssd)
     //initialize the superblock info 
 	intialize_sb(ssd);
 
+	ssd->nvram_log = (struct NVRAM_OOB_LOG *)malloc(sizeof(struct NVRAM_OOB_LOG));
+	alloc_assert(ssd->nvram_log, "ssd->nvram_log");
+	ssd->nvram_log->next_avail_time = 0;
+	ssd->nvram_log->total_entry = 0;
+	ssd->nvram_log->invalid_entry = 0;
+	ssd->total_oob_entry = 0;
+	ssd->invalid_oob_entry = 0;
+	// ssd->max_ref = 0;
+
 	//Initialize dram_info
 	ssd->dram = (struct dram_info *)malloc(sizeof(struct dram_info));
 	alloc_assert(ssd->dram, "ssd->dram");
@@ -133,7 +142,7 @@ struct ssd_info *initiation(struct ssd_info *ssd)
 		return NULL;
 	}
 
-	fprintf(ssd->stat_file, "avg write delay print, max write delay print\n");
+	fprintf(ssd->stat_file, "write request, total oob entry, invalid entry, avg write delay print, max write delay print, nvram gc, avg nvram gc delay, gc scan nvram, avg scan nvram delay\n");
 	fflush(ssd->stat_file);
 
 	printf("\n initiation is completed!\n");
@@ -181,6 +190,13 @@ void initialize_statistic(struct ssd_info * ssd)
 	ssd->max_write_delay_print = 0;
 	ssd->last_write_avg = 0;
 
+	ssd->nvram_gc_print = 0;
+	ssd->nvram_gc_delay_print = 0;
+	ssd->avg_nvram_gc_delay = 0;
+
+	ssd->gcr_nvram_print = 0;
+	ssd->gcr_nvram_delay_print = 0;
+	ssd->avg_gcr_nvram_delay = 0;
 }
 
 struct dram_info * initialize_dram(struct ssd_info * ssd)

@@ -8,7 +8,12 @@
 #include "avlTree.h"
 
 #define UNIQUE_PAGE_NB 1000000 // fing [1, UNIQUE_PAGE_NB]
-#define FING_DELAY 32000 // fing compare delay, 32 us
+#define FING_DELAY 32000 // fing compare delay, 32us
+#define MAX_OOB_ENTRY 1000000
+#define OOB_ENTRY_BYTES 16
+#define NVRAM_READ_DELAY 50 // 50ns for PCM 64 byte
+#define NVRAM_WRITE_DELAY 500 // 500ns for PCM 64 byte
+#define INVALID_ENTRY_THRE 0.05
 
 #define SECTOR 512
 #define BUFSIZE 200
@@ -274,6 +279,7 @@ struct ssd_info{
 	FILE *statisticfile;
 
 	FILE *stat_file;
+	struct NVRAM_OOB_LOG *nvram_log;
 
     struct parameter_value *parameter;   //SSD parameter
 	struct dram_info *dram;
@@ -291,10 +297,21 @@ struct ssd_info{
 	unsigned int process_enhancement;
 
 	unsigned int reduced_writes;
+	unsigned int total_oob_entry;
+	unsigned int invalid_oob_entry;
+	// unsigned int max_ref;
 
-	long long avg_write_delay_print; // write_request_count % 10000 = 1 ���һ�Σ��������0
+	long long avg_write_delay_print; // write_request_count % 10000 = 1
 	long long max_write_delay_print;
 	long long last_write_avg;
+
+	unsigned int nvram_gc_print;
+	long long nvram_gc_delay_print;
+	long long avg_nvram_gc_delay;
+
+	unsigned int gcr_nvram_print;
+	long long gcr_nvram_delay_print;
+	long long avg_gcr_nvram_delay;
 };
 
 
@@ -540,6 +557,12 @@ struct FING2PPN{
 struct LPN_ENTRY{
 	unsigned int lpn;
 	struct LPN_ENTRY *next;
+};
+
+struct NVRAM_OOB_LOG{
+	__int64 next_avail_time;
+	unsigned int total_entry;
+	unsigned int invalid_entry;
 };
 
 struct local{          

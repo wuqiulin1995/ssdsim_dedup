@@ -114,3 +114,35 @@ __int64 ssd_page_write(struct ssd_info *ssd, unsigned int channel, unsigned int 
 
 	return ssd->channel_head[channel].chip_head[chip].next_state_predict_time;
 }
+
+Status update_flash_ts(struct ssd_info *ssd, __int64 blocking_to_ts)
+{
+	int i = 0, j = 0;
+
+	for(i = 0; i < ssd->parameter->channel_number; i++)
+	{
+		for(j = 0; j < ssd->channel_head[i].chip; j++)
+		{
+			if(ssd->channel_head[i].chip_head[j].next_state_predict_time < blocking_to_ts)
+			{
+				ssd->channel_head[i].chip_head[j].next_state_predict_time = blocking_to_ts;
+			}
+		}
+	}
+
+	return SUCCESS;
+}
+
+__int64 update_nvram_ts(struct ssd_info *ssd, __int64 need_time)
+{
+	if(ssd->nvram_log->next_avail_time < ssd->current_time)
+	{
+		ssd->nvram_log->next_avail_time = ssd->current_time + need_time;
+	}
+	else
+	{
+		ssd->nvram_log->next_avail_time += need_time;
+	}
+
+	return 	ssd->nvram_log->next_avail_time;
+}
