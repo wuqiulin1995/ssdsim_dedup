@@ -60,7 +60,6 @@ struct ssd_info *initiation(struct ssd_info *ssd)
 	//Import the configuration file for ssd
 	parameters=load_parameters(ssd->parameterfilename);
 	ssd->parameter=parameters;
-	ssd->page=ssd->parameter->chip_num*ssd->parameter->die_chip*ssd->parameter->plane_die*ssd->parameter->block_plane*ssd->parameter->page_block;
 	secno_num_per_page = ssd->parameter->page_capacity / SECTOR;
 	secno_num_sub_page = ssd->parameter->subpage_capacity / SECTOR; 
 
@@ -127,7 +126,7 @@ struct ssd_info *initiation(struct ssd_info *ssd)
 
 	fclose(fp);
 
-	if ((err = fopen_s(&ssd->stat_file, "dedup_base_stat.csv","w")) != 0)
+	if ((err = fopen_s(&ssd->stat_file, ssd->stat_file_name, "w")) != 0)
 	{
 		printf("the dedup_base stat file can't open\n");
 		return NULL;
@@ -138,42 +137,32 @@ struct ssd_info *initiation(struct ssd_info *ssd)
 
 	printf("\n initiation is completed!\n");
     
-	ssd->process_enhancement = 1;
 	return ssd;
 }
 
 void initialize_statistic(struct ssd_info * ssd)
 {
+	ssd->buffer_full_flag = 0;
+	ssd->request_lz_count = 0;
+
 	ssd->min_lsn=0x7fffffff;
 	ssd->max_lsn=0;
 
-	ssd->req_read_hit_cnt = 0;
-	ssd->pre_all_write = 0;
-	ssd->erase_count = 0;
-	ssd->direct_erase_count = 0;
-	ssd->m_plane_read_count = 0;
 	ssd->read_request_count = 0;
 	ssd->write_request_count = 0;
-	ssd->read_request_count = 0;
-	ssd->ave_read_size = 0.0;
-	ssd->ave_write_size = 0.0;
-	ssd->gc_count = 0;
-	ssd->mplane_erase_count = 0;
 
-	//Initializes the global variable for ssd_info
-	ssd->make_age_free_page = 0;
-	ssd->buffer_full_flag = 0;
-	ssd->request_lz_count = 0;
-	ssd->resume_count = 0;
-	ssd->read_avg = 0;
-	ssd->write_avg = 0;
-	ssd->write_request_count = 0;
-	ssd->read_request_count = 0;
-	ssd->m_plane_prog_count = 0;
-	ssd->mutliplane_oneshot_prog_count = 0;
-	ssd->one_shot_read_count = 0;
+	ssd->erase_count = 0;
+	ssd->gc_count = 0;
+	ssd->gc_program_cnt = 0;
+
 	ssd->data_read_cnt = 0;
 	ssd->data_program_cnt = 0;
+
+	ssd->ave_read_size = 0.0;
+	ssd->ave_write_size = 0.0;
+
+	ssd->read_avg = 0;
+	ssd->write_avg = 0;
 
 	ssd->reduced_writes = 0;
 

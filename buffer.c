@@ -93,7 +93,7 @@ Status handle_write_request(struct ssd_info *ssd, struct request *req)
 		update_new_page_mapping(ssd, lpn, new_ppn);
 		ssd->dram->map->in_nvram[lpn] = 0;
 
-		if(ssd->free_sb_cnt <= MIN_SB_RATE * ssd->sb_cnt)
+		if(ssd->free_sb_cnt <= (int)(MIN_SB_RATE * ssd->sb_cnt))
 		{
 			SuperBlock_GC(ssd, req);
 		}
