@@ -55,7 +55,7 @@ int get_requests(struct ssd_info *ssd)
 		fgets(buffer, 200, ssd->tracefile);
 		sscanf(buffer, "%I64u %d %d %d %d", &time_t, &lsn, &size, &ope, &fing);
 		
-		// time_t = time_t * 10;
+		//time_t = time_t / 10;
 
 		if (feof(ssd->tracefile))      //if the end of trace
 			break;
@@ -204,7 +204,7 @@ int get_requests(struct ssd_info *ssd)
 
 	ssd->request_lz_count++;
 
-	if (ssd->request_lz_count % 100000 == 0)
+	if (ssd->request_lz_count % 200000 == 0)
 		printf("request:%lu\n", ssd->request_lz_count);
 
 	if (request1->operation == READ)             //Calculate the average request size ,1 for read 0 for write

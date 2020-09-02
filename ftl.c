@@ -121,6 +121,7 @@ Status SuperBlock_GC(struct ssd_info *ssd, struct request *req)
 		getchar();
 	}
 
+	ssd->gc_program_cnt += md_cnt;
 	ssd->gc_count++;
 	ssd->total_gc_count++;
 	 
@@ -133,7 +134,7 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 {
 	int i, j;
 	unsigned int chan, chip, die, plane, block, page;
-	unsigned int lpn, new_ppn = INVALID_PPN;
+	unsigned int lpn, old_ppn = INVALID_PPN, new_ppn = INVALID_PPN;
 	__int64 time;
 	unsigned int sum_md;
 	int ref_cnt;
@@ -158,6 +159,14 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 						{
 							sum_md++;
 							lpn = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn;
+
+							old_ppn = find_ppn(ssd, chan, chip, die, plane, block, page);
+
+							if(ssd->dram->map->L2P_entry[lpn].pn != old_ppn)
+							{
+								printf("ssd->dram->map->L2P_entry[lpn].pn != old_ppn\n");
+								getchar();
+							}
 
 							new_ppn = get_new_page(ssd);
 							
@@ -232,10 +241,10 @@ int find_victim_superblock(struct ssd_info *ssd)
 		}
 	}
 
-	if (max_sb_cnt < ssd->open_sb->blk_cnt * ssd->parameter->page_block * 0.1)
-	{
-		printf("Look Here 9\n");
-	}
+	// if (max_sb_cnt < ssd->open_sb->blk_cnt * ssd->parameter->page_block * 0.1)
+	// {
+	// 	printf("Look Here 9\n");
+	// }
 
 	ssd->sb_pool[sb_no].gcing = 1;
 	return sb_no;
