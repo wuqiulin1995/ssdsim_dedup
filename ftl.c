@@ -131,6 +131,7 @@ Status SuperBlock_GC(struct ssd_info *ssd, struct request *req)
 		getchar();
 	}
 
+	ssd->gc_program_cnt += md_cnt;
 	ssd->gc_count++;
 	ssd->total_gc_count++;
 	 
@@ -294,10 +295,10 @@ int find_victim_superblock(struct ssd_info *ssd)
 		}
 	}
 
-	if (max_sb_cnt < ssd->open_sb->blk_cnt * ssd->parameter->page_block * 0.1)
-	{
-		printf("Look Here 9\n");
-	}
+	// if (max_sb_cnt < ssd->open_sb->blk_cnt * ssd->parameter->page_block * 0.1)
+	// {
+	// 	printf("Look Here 9\n");
+	// }
 
 	ssd->sb_pool[sb_no].gcing = 1;
 	return sb_no;
