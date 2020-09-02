@@ -17,11 +17,12 @@
 
 int secno_num_per_page, secno_num_sub_page;
 
-char* parameters_file =  "page64GB.parameters";
-char* trace_file = "homes.ascii";
-char* warm_trace_file = "homes.ascii";
-char* result_file_statistic = "statistic_file.txt";
-char* result_file_ex =  "output_file.txt";
+char* parameters_file =  "page256GB.parameters";
+char* trace_file = "mail5_fing.ascii";
+char* warm_trace_file = "mail5_fing.ascii";
+char* result_file_statistic = "mail5_statistic.txt";
+char* result_file_ex =  "mail5_output.txt";
+char stat_file[50] = "dedup_base_mail5.csv";
 
 int main()
 {
@@ -32,9 +33,9 @@ int main()
 	memset(ssd, 0, sizeof(struct ssd_info));
 	
 	strcpy_s(ssd->parameterfilename, 50, parameters_file);
-	strcpy_s(ssd->tracefilename, 50, trace_file);
 	strcpy_s(ssd->outputfilename, 50, result_file_ex);
 	strcpy_s(ssd->statisticfilename, 50, result_file_statistic);
+	strcpy_s(ssd->stat_file_name, 50, stat_file);
 
 	printf("tracefile:%s begin simulate-------------------------\n", ssd->tracefilename);
 	tracefile_sim(ssd);
@@ -54,17 +55,21 @@ void tracefile_sim(struct ssd_info *ssd)
 	#endif
 	ssd = initiation(ssd);
 
+	printf("sb_cnt = %d, gc thre = %d\n", ssd->sb_cnt, (int)(MIN_SB_RATE * ssd->sb_cnt));
+
 	ssd->warm_flash_cmplt = 0;
 	ssd->total_gc_count = 0;
 
+	strcpy_s(ssd->tracefilename, 50, warm_trace_file);
 	while(ssd->total_gc_count < 1)
 	{
-		strcpy_s(ssd->tracefilename, 50, warm_trace_file);
-		warm_flash(ssd);	
+		warm_flash(ssd);
+		printf("ssd->free_sb_cnt = %d, gc thre = %d\n", ssd->free_sb_cnt, (int)(MIN_SB_RATE * ssd->sb_cnt));
 		reset(ssd);
 	}
 
 	ssd->warm_flash_cmplt = 1;
+	printf("ssd->total_gc_count = %lu\n", ssd->total_gc_count);
 
 	strcpy_s(ssd->tracefilename, 50, trace_file);
 	ssd=simulate(ssd);
@@ -343,27 +348,27 @@ void statistic_output(struct ssd_info *ssd)
 	fprintf(ssd->statisticfile,"max lsn: %13d\n",ssd->max_lsn);
 	fprintf(ssd->statisticfile, "\n");
 
+	fprintf(ssd->statisticfile, "read request count: %13lu\n", ssd->read_request_count);
+	fprintf(ssd->statisticfile, "write request count: %13lu\n", ssd->write_request_count);
 	fprintf(ssd->statisticfile, "\n");
+
 	fprintf(ssd->statisticfile, "erase count: %13lu\n",ssd->erase_count);
 	fprintf(ssd->statisticfile, "gc count: %13lu\n", ssd->gc_count);
+	fprintf(ssd->statisticfile, "gc program count: %13lu\n", ssd->gc_program_cnt);
+	fprintf(ssd->statisticfile, "\n");
 
+	fprintf(ssd->statisticfile, "data read cnt: %13lu\n", ssd->data_read_cnt);
+	fprintf(ssd->statisticfile, "data program: %13lu\n", ssd->data_program_cnt);
 	fprintf(ssd->statisticfile, "\n");
-	fprintf(ssd->statisticfile, "data read cnt: %13d\n", ssd->data_read_cnt);
-	fprintf(ssd->statisticfile, "data program: %13d\n", ssd->data_program_cnt);
 
-	fprintf(ssd->statisticfile, "\n");
-	
-	fprintf(ssd->statisticfile,"read request count: %13lu\n",ssd->read_request_count);
-	fprintf(ssd->statisticfile,"write request count: %13lu\n",ssd->write_request_count);
-	fprintf(ssd->statisticfile, "\n");
 	fprintf(ssd->statisticfile,"read request average size: %13f\n",ssd->ave_read_size);
 	fprintf(ssd->statisticfile,"write request average size: %13f\n",ssd->ave_write_size);
 	fprintf(ssd->statisticfile, "\n");
+
 	if (ssd->read_request_count != 0)
 		fprintf(ssd->statisticfile, "read request average response time: %16I64u\n", ssd->read_avg / ssd->read_request_count);
 	if (ssd->write_request_count != 0)
 		fprintf(ssd->statisticfile, "write request average response time: %16I64u\n", ssd->write_avg / ssd->write_request_count);
-	fprintf(ssd->statisticfile, "\n");
 
 	fflush(ssd->statisticfile);
 

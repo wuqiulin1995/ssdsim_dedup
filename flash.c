@@ -32,7 +32,7 @@ __int64 ssd_page_read(struct ssd_info *ssd, unsigned int channel, unsigned int c
 	__int64 start_transfer_ts = 0, read_time = 0, transfer_time = 0;
 
 	read_time = ssd->parameter->time_characteristics.tR;
-	transfer_time = 7 * ssd->parameter->time_characteristics.tWC + ssd->parameter->page_capacity * ssd->parameter->time_characteristics.tWC;
+	transfer_time = 7 * ssd->parameter->time_characteristics.tWC + ssd->parameter->page_capacity * ssd->parameter->time_characteristics.tRC;
 
 	if ((ssd->channel_head[channel].chip_head[chip].current_state == CHIP_IDLE) ||
 			((ssd->channel_head[channel].chip_head[chip].next_state == CHIP_IDLE) &&
@@ -93,7 +93,7 @@ __int64 ssd_page_write(struct ssd_info *ssd, unsigned int channel, unsigned int 
 		ssd->channel_head[channel].next_state_predict_time += transfer_time;
 	}
 
-	start_prog_ts = ssd->channel_head[channel].chip_head[chip].next_state_predict_time;
+	start_prog_ts = ssd->channel_head[channel].next_state_predict_time;
 
 	if ((ssd->channel_head[channel].chip_head[chip].current_state == CHIP_IDLE) ||
 			((ssd->channel_head[channel].chip_head[chip].next_state == CHIP_IDLE) &&

@@ -201,12 +201,9 @@ struct ac_time_characteristics{
 
 struct ssd_info{ 
 	//Global variable
-	int make_age_free_page;				 //The number of free pages after make_aged
 	int buffer_full_flag;				 //buffer blocking flag:0--unblocking , 1-- blocking
 	int trace_over_flag;				 //the end of trace flag:0-- not ending ,1--ending
 	unsigned long request_lz_count;			 //trace request count
-	unsigned int page_count;
-	unsigned int die_token;
 	int warm_flash_cmplt;
 	
 	//superblock info
@@ -220,59 +217,13 @@ struct ssd_info{
 	unsigned int real_time_subreq;       //Record the number of real-time write requests, used in the full dynamic allocation, channel priority situation
 
 	int flag;
-	unsigned int page;
-
-	unsigned int token;                  //In the dynamic allocation, in order to prevent each assignment in the first channel need to maintain a token, each time from the token refers to the location of the distribution
-	unsigned int gc_request;             //Recorded in the SSD, the current moment how many gc operation request
-
-	__int64 write_avg;                   //Record the time to calculate the average response time for the write request
-	__int64 read_avg;                    //Record the time to calculate the average response time for the read request
-
-	unsigned int min_lsn;
-	unsigned int max_lsn;
-
-	//read hit
-	unsigned long req_read_hit_cnt;
-
-	unsigned long half_page_read_count;   //Recond the number of half page read operation
-	unsigned long one_shot_read_count;	  //Recond the number of one shot read operation
-	unsigned long one_shot_mutli_plane_count;//Record the number of one shot mutli plane read operation
-	unsigned long resume_count;
-	unsigned long suspend_count;
-	unsigned long suspend_read_count;
-
-	unsigned long pre_all_write;		 //Record preprocessing write operation
-
-	unsigned long erase_count;
-	unsigned long direct_erase_count;    //Record invalid blocks that are directly erased
-	unsigned long gc_count;
-	unsigned long total_gc_count;
-
-	//Advanced command read and write erase statistics
-	unsigned long m_plane_read_count;
-	unsigned long m_plane_prog_count;
-	unsigned long mplane_erase_count;
-
-	unsigned long ontshot_prog_count;
-	unsigned long mutliplane_oneshot_prog_count;
-
-	unsigned long waste_page_count;      //Record the page waste due to restrictions on advanced commands
-
-	unsigned long write_request_count;    //Record the number of write operations
-	unsigned long read_request_count;     //Record the number of read operations
-	
-	float ave_read_size;
-	float ave_write_size;
 	unsigned int request_queue_length;
 	
 	char parameterfilename[50];
 	char tracefilename[50];
 	char outputfilename[50];
 	char statisticfilename[50];
-	// char read_disturb_filename[50];
-	// char statistic_time_filename[50];
-	// char statistic_size_filename[50];
-	// char die_read_req_name[50];
+	char stat_file_name[50];
 
 	FILE *outputfile;
 	FILE *tracefile;
@@ -291,16 +242,30 @@ struct ssd_info{
 	struct sub_request *subs_w_tail;
 	struct channel_info *channel_head;   //Points to the first address of the channel structure array
 
+	unsigned int min_lsn;
+	unsigned int max_lsn;
+
+	unsigned long write_request_count;    //Record the number of write operations
+	unsigned long read_request_count;     //Record the number of read operations
+	
+	unsigned long erase_count;
+	unsigned long gc_count;
+	unsigned long total_gc_count;
+
 	unsigned int data_read_cnt;
 	unsigned int data_program_cnt;
-
-	unsigned int process_enhancement;
+	unsigned long gc_program_cnt;
 
 	unsigned int reduced_writes;
 	unsigned int use_remap_fail;
 	unsigned int total_oob_entry;
 	unsigned int invalid_oob_entry;
 	// unsigned int max_ref;
+	
+	float ave_read_size;
+	float ave_write_size;
+	__int64 write_avg;                   //Record the time to calculate the average response time for the write request
+	__int64 read_avg;                    //Record the time to calculate the average response time for the read request
 
 	long long avg_write_delay_print; // write_request_count % 10000 = 1
 	long long max_write_delay_print;
