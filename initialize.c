@@ -193,7 +193,7 @@ struct dram_info * initialize_dram(struct ssd_info * ssd)
 	max_para = ssd->parameter->plane_die * ssd->parameter->die_chip * ssd->parameter->chip_num;
 
 	//Mapping Table: LPN -> PPN
-	page_num = (ssd->parameter->page_block * ssd->parameter->block_plane * max_para) / (1 + ssd->parameter->overprovide);
+	page_num = (ssd->parameter->page_block * ssd->parameter->block_plane * max_para) * (1 - ssd->parameter->overprovide);
 	// sub_page_num = page_num * ssd->parameter->subpage_page;
 
 	dram->map = (struct map_info*)malloc(sizeof(struct map_info));
