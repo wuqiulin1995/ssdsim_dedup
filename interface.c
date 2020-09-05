@@ -46,7 +46,7 @@ int get_requests(struct ssd_info *ssd)
 		return 0;
 	}
 
-	large_lsn = (int)((secno_num_per_page * ssd->parameter->page_block * ssd->parameter->block_plane * ssd->parameter->plane_die * ssd->parameter->die_chip * ssd->parameter->chip_num) / (1 + ssd->parameter->overprovide));
+	large_lsn = (int)((secno_num_per_page * ssd->parameter->page_block * ssd->parameter->block_plane * ssd->parameter->plane_die * ssd->parameter->die_chip * ssd->parameter->chip_num) * (1 - ssd->parameter->overprovide));
 	max_lsn = (int)(large_lsn * 1);
 
 	while (TRUE)
