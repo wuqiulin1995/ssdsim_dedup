@@ -143,6 +143,7 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 	unsigned int sum_md;
 	struct local loc;
 	int oob_write = 0;
+	struct LPN_ENTRY *lpn_entry = NULL, *tmp_entry = NULL;
 
 	sum_md = 0;
 
@@ -158,21 +159,23 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 				{
 					for (plane = 0; plane < ssd->parameter->plane_die; plane++)
 					{
-						if(ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn_entry != NULL)
+						lpn_entry = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn_entry;
+						tmp_entry = lpn_entry;
+						if( lpn_entry != NULL)
 						{
 							sum_md++;
 							oob_write = 0;
 
 							fing = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].fing;
 
-							if(fing < 1 || fing > UNIQUE_PAGE_NB)
-							{
-								printf("ERROR: fing < 1 || fing > UNIQUE_PAGE_NB, %d\n", fing);
-								getchar();
-							}
-
 							old_ppn = find_ppn(ssd, chan, chip, die, plane, block, page);
 							new_ppn = get_new_page(ssd);
+
+							if(fing < 1 || fing > UNIQUE_PAGE_NB || ssd->dram->map->F2P_entry[fing].pn != old_ppn)
+							{
+								printf("ERROR: fing ERROR in GC\n");
+								getchar();
+							}
 
 							if(new_ppn == INVALID_PPN)
 							{
@@ -189,9 +192,9 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 							ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].fing = fing;
 							ssd->dram->map->F2P_entry[fing].pn = new_ppn;
 
-							while(ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn_entry != NULL)
+							while(tmp_entry != NULL)
 							{
-								lpn = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn_entry->lpn;		
+								lpn = tmp_entry->lpn;		
 
 								if(ssd->dram->map->L2P_entry[lpn].pn != old_ppn)
 								{
@@ -199,9 +202,10 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 									getchar();
 								}
 
-								invalidate_old_lpn(ssd, lpn);
+								// invalidate_old_lpn(ssd, lpn);
+								// update_new_page_mapping(ssd, lpn, new_ppn);
 
-								update_new_page_mapping(ssd, lpn, new_ppn);
+								ssd->dram->map->L2P_entry[lpn].pn = new_ppn;
 
 								if(oob_write == 0)
 								{
@@ -211,8 +215,14 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 								else
 								{
 									ssd->dram->map->in_nvram[lpn] = 1;
-								}	
+								}
+
+								tmp_entry = tmp_entry->next;
 							}
+
+							ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].lpn_entry = lpn_entry;
+							ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn_entry = NULL;
+							lpn_entry = NULL;
 						}						
 					}
 				}
