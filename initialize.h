@@ -114,7 +114,7 @@
 #define CHIP_LEVEL 3
 #define CHANNEL_LEVEL 4
 
-#define MIN_SB_RATE 0.05
+#define MIN_SB_RATE 0.1
 #define INVALID_PPN -1
 
 #define FULL_FLAG 1024
