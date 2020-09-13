@@ -17,12 +17,12 @@
 
 int secno_num_per_page, secno_num_sub_page;
 
-char* parameters_file =  "page256GB.parameters";
-char* trace_file = "mail5_fing.ascii";
-char* warm_trace_file = "mail5_fing.ascii";
-char* result_file_statistic = "mail5_statistic.txt";
-char* result_file_ex =  "mail5_output.txt";
-char stat_file[50] = "dedup_base_mail5.csv";
+char* parameters_file = "page256GB.parameters";
+char* trace_file = "homes_fing.ascii";
+char* warm_trace_file = "homes_fing.ascii";
+char* result_file_statistic = "homes_statistic.txt";
+char* result_file_ex = "homes_output.txt";
+char stat_file[50] = "dedup_base_homes.csv";
 
 int main()
 {
@@ -208,6 +208,8 @@ void make_aged(struct ssd_info *ssd)
 	unsigned int chan, chip, die, plane, block, page;
 	unsigned int *lpn_array = NULL, i = 0, exchange = 0, tmp = 0;
 	unsigned int rand_idx = 0, lpn = 0, new_ppn = 0;
+	unsigned int sb_invalid[2560];
+	struct local loc;
 
 	max_lpn = 256 * 1024 * 1024 / 4; // 256GB / 4KB
 	dup_ppn_nb = 0; // base version, no dup
@@ -219,6 +221,11 @@ void make_aged(struct ssd_info *ssd)
 	lpn_array = (unsigned int *)malloc(sizeof(unsigned int) * max_lpn);
 	alloc_assert(lpn_array, "lpn_array");
 
+	for (i = 0; i < 2560; i++)
+	{
+		sb_invalid[i] = 0;
+	}
+
 	for(i = 0; i < max_lpn; i++)
 	{
 		lpn_array[i] = i;
@@ -227,9 +234,10 @@ void make_aged(struct ssd_info *ssd)
 	srand((unsigned int)time(NULL));
 
 	// randomize lpn_array
+	printf("randomize lpn_array\n");
 	for(i = 0; i < max_lpn; i++)
 	{
-		exchange = rand()%(max_lpn - i) + i;
+		exchange =(((long long)rand() << 15) + rand()) % (max_lpn - i) + i;
 
 		tmp = lpn_array[i];
 		lpn_array[i] = lpn_array[exchange];
@@ -237,6 +245,7 @@ void make_aged(struct ssd_info *ssd)
 	}
 
 	// fill unique page
+	printf("fill unique page\n");
 	for(i = 0; i < unique_ppn_nb; i++)
 	{
 		lpn = lpn_array[i];
@@ -252,9 +261,10 @@ void make_aged(struct ssd_info *ssd)
 	}
 
 	// randomly invalidate and move data
+	printf("randomly invalidate and move data\n");
 	for(i = 0; i < move_ppn_nb; i++)
 	{
-		rand_idx = rand()%unique_ppn_nb;
+		rand_idx = (((long long)rand() << 15) + rand()) % unique_ppn_nb;
 
 		lpn = lpn_array[rand_idx];
 
@@ -268,8 +278,18 @@ void make_aged(struct ssd_info *ssd)
 
 		invalidate_old_lpn(ssd, lpn);
 
+		find_location_ppn(ssd, ssd->dram->map->L2P_entry[lpn].pn, &loc);
+		sb_invalid[loc.block]++;
+
 		update_new_page_mapping(ssd, lpn, new_ppn);
 	}
+
+	fprintf(ssd->statisticfile, "---------------------------make aged---------------------------\n");
+	for (i = 0; i < 2560; i++)
+	{
+		fprintf(ssd->statisticfile, "superblock[%4d] has %6u invalid page\n", i, sb_invalid[i]);
+	}
+	fflush(ssd->statisticfile);
 
 	free(lpn_array);
 	lpn_array = NULL;
@@ -435,7 +455,7 @@ void statistic_output(struct ssd_info *ssd)
 
 	fflush(ssd->statisticfile);
 
-	fclose(ssd->outputfile);
+	// fclose(ssd->outputfile);
 	fclose(ssd->statisticfile);
 }
 

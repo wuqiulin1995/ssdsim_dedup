@@ -82,11 +82,11 @@ struct ssd_info *initiation(struct ssd_info *ssd)
 	memset(ssd->dram, 0, sizeof(struct dram_info));
 	initialize_dram(ssd);
 
-	if ((err = fopen_s(&ssd->outputfile,ssd->outputfilename,"w")) != 0)
-	{
-		printf("the output file can't open\n");
-		return NULL;
-	}
+	// if ((err = fopen_s(&ssd->outputfile,ssd->outputfilename,"w")) != 0)
+	// {
+	// 	printf("the output file can't open\n");
+	// 	return NULL;
+	// }
 
 	if((err=fopen_s(&ssd->statisticfile,ssd->statisticfilename,"w"))!= 0)
 	{
@@ -94,12 +94,12 @@ struct ssd_info *initiation(struct ssd_info *ssd)
 		return NULL;
 	}
 
-	fprintf(ssd->outputfile,"parameter file: %s\n",ssd->parameterfilename); 
-	fprintf(ssd->outputfile,"trace file: %s\n",ssd->tracefilename);
+	// fprintf(ssd->outputfile,"parameter file: %s\n",ssd->parameterfilename); 
+	// fprintf(ssd->outputfile,"trace file: %s\n",ssd->tracefilename);
 	fprintf(ssd->statisticfile,"parameter file: %s\n",ssd->parameterfilename); 
 	fprintf(ssd->statisticfile,"trace file: %s\n",ssd->tracefilename);
 
-	fflush(ssd->outputfile);
+	// fflush(ssd->outputfile);
 	fflush(ssd->statisticfile);
 
 	if((err=fopen_s(&fp,ssd->parameterfilename,"r"))!=0)
@@ -108,19 +108,19 @@ struct ssd_info *initiation(struct ssd_info *ssd)
 		return NULL;
 	}
 
-	fprintf(ssd->outputfile,"\n-----------------------parameter file----------------------\n");
+	// fprintf(ssd->outputfile,"\n-----------------------parameter file----------------------\n");
 	fprintf(ssd->statisticfile,"\n-----------------------parameter file----------------------\n");
 
 	while(fgets(buffer,300,fp))
 	{
-		fprintf(ssd->outputfile,"%s",buffer);
-		fflush(ssd->outputfile);
+		// fprintf(ssd->outputfile,"%s",buffer);
+		// fflush(ssd->outputfile);
 		fprintf(ssd->statisticfile,"%s",buffer);
 		fflush(ssd->statisticfile);
 	}
 
-	fprintf(ssd->outputfile,"\n\n-----------------------simulation output-----------------------\n");
-	fflush(ssd->outputfile);
+	// fprintf(ssd->outputfile,"\n\n-----------------------simulation output-----------------------\n");
+	// fflush(ssd->outputfile);
 
 	fprintf(ssd->statisticfile,"\n\n-----------------------simulation output----------------------\n");
 	fflush(ssd->statisticfile);
