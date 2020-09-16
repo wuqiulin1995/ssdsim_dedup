@@ -342,6 +342,7 @@ void make_aged(struct ssd_info *ssd)
 	unsigned int *lpn_array = NULL, i = 0, exchange = 0, tmp = 0;
 	unsigned int rand_idx = 0, lpn = 0, new_ppn = 0, dup_ppn = 0;
 	unsigned int used_sb_nb = 0, avg_seg_sb = 0;
+	unsigned int sb_invalid[2560];
 	struct local loc;
 
 	max_lpn = 256 * 1024 * 1024 / 4; // 256GB / 4KB
@@ -350,6 +351,11 @@ void make_aged(struct ssd_info *ssd)
 	move_ppn_nb = (unsigned int)(max_lpn / (1 - ssd->parameter->overprovide) * (1 - MIN_SB_RATE)) - unique_ppn_nb; // 256GB / 0.8 * 0.9 - unique
 	used_sb_nb = (unsigned int)(ssd->sb_cnt * (1 - MIN_SB_RATE));
 	avg_seg_sb = (unsigned int)(MAX_OOB_SEG * 0.9 / used_sb_nb);
+
+	for (i = 0; i < 2560; i++)
+	{
+		sb_invalid[i] = 0;
+	}
 
 	for(i = 0; i < used_sb_nb; i++)
 	{
@@ -371,9 +377,10 @@ void make_aged(struct ssd_info *ssd)
 	srand((unsigned int)time(NULL));
 
 	// randomize lpn_array
+	printf("randomize lpn_array\n");
 	for(i = 0; i < max_lpn; i++)
 	{
-		exchange = rand()%(max_lpn - i) + i;
+		exchange =(((long long)rand() << 15) + rand()) % (max_lpn - i) + i;
 
 		tmp = lpn_array[i];
 		lpn_array[i] = lpn_array[exchange];
@@ -396,9 +403,10 @@ void make_aged(struct ssd_info *ssd)
 	}
 
 	// randomly invalidate and move data
+	printf("randomly invalidate and move data\n");
 	for(i = 0; i < move_ppn_nb; i++)
 	{
-		rand_idx = rand()%unique_ppn_nb;
+		rand_idx = (((long long)rand() << 15) + rand()) % unique_ppn_nb;
 
 		lpn = lpn_array[rand_idx];
 
@@ -416,9 +424,10 @@ void make_aged(struct ssd_info *ssd)
 	}
 
 	// randomly dedup data
+	printf("randomly dedup data\n");
 	for(i = 0; i < dup_ppn_nb; i++)
 	{
-		rand_idx = rand()%unique_ppn_nb;
+		rand_idx = (((long long)rand() << 15) + rand()) % unique_ppn_nb;
 
 		lpn = lpn_array[rand_idx];
 
@@ -449,6 +458,14 @@ void make_aged(struct ssd_info *ssd)
 		}
 		ssd->nvram_seg[loc.block].invalid_entry--;
 	}
+
+	
+	fprintf(ssd->statisticfile, "---------------------------make aged---------------------------\n");
+	for (i = 0; i < 2560; i++)
+	{
+		fprintf(ssd->statisticfile, "superblock[%4d] has %6u invalid page, %5u invalid entries\n", i, sb_invalid[i], ssd->nvram_seg[i].invalid_entry);
+	}
+	fflush(ssd->statisticfile);
 
 	free(lpn_array);
 	lpn_array = NULL;
@@ -510,7 +527,7 @@ void statistic_output(struct ssd_info *ssd)
 
 	fflush(ssd->statisticfile);
 
-	fclose(ssd->outputfile);
+	// fclose(ssd->outputfile);
 	fclose(ssd->statisticfile);
 }
 
