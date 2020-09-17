@@ -15,7 +15,7 @@ extern int secno_num_per_page, secno_num_sub_page;
 
 Status invalidate_old_lpn(struct ssd_info* ssd, unsigned int lpn)
 {
-	unsigned int ppn;
+	unsigned int ppn = INVALID_PPN, fing = 0;
 	struct local loc;
 
 	ppn = ssd->dram->map->L2P_entry[lpn].pn;
@@ -27,9 +27,12 @@ Status invalidate_old_lpn(struct ssd_info* ssd, unsigned int lpn)
 		decrease_reverse_mapping(ssd, ppn, lpn);
 
 		if(ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].lpn_entry == NULL)
-		{
+		{	
+			fing = ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].fing;
+			ssd->dram->map->F2P_entry[fing].pn = INVALID_PPN;
+
 			ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].invalid_page_num++;
-		}	
+		}
 	}
 
 	return SUCCESS;
@@ -110,11 +113,17 @@ Status find_location_ppn(struct ssd_info* ssd, unsigned int ppn, struct local *l
 //each time write operation is carried out, judge whether superblock-garbage is carried out
 Status SuperBlock_GC(struct ssd_info *ssd, struct request *req)
 {
-	unsigned int sb_no;
+	int sb_no = -1;
 	unsigned int md_cnt,invalid_cnt;
 	//find victim garbage superblock
-	sb_no = find_victim_superblock(ssd);
-	invalid_cnt = Get_SB_Invalid(ssd, sb_no);
+	invalid_cnt = find_victim_superblock(ssd, &sb_no);
+	// invalid_cnt = Get_SB_Invalid(ssd, sb_no);
+
+	if(sb_no == -1)
+	{
+		printf("ERROR: no victim block\n");
+		getchar();
+	}
 
 	//migrate and erase
 	md_cnt = migration_horizon(ssd, req, sb_no);
@@ -140,12 +149,10 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 	unsigned int chan, chip, die, plane, block, page;
 	unsigned int lpn, old_ppn = INVALID_PPN, new_ppn = INVALID_PPN, fing = 0;
 	__int64 time;
-	unsigned int sum_md;
+	unsigned int sum_md = 0, transfer = 0;
 	struct local loc;
 	int oob_write = 0;
 	struct LPN_ENTRY *lpn_entry = NULL, *tmp_entry = NULL;
-
-	sum_md = 0;
 
 	block = ssd->sb_pool[victim].pos[0].block;
 
@@ -155,15 +162,17 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 		{
 			for (chip = 0; chip < ssd->parameter->chip_channel[chan]; chip++)
 			{
+				transfer = 0;
 				for (die = 0; die < ssd->parameter->die_chip; die++)
 				{
 					for (plane = 0; plane < ssd->parameter->plane_die; plane++)
 					{
 						lpn_entry = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn_entry;
 						tmp_entry = lpn_entry;
-						if( lpn_entry != NULL)
+						if(lpn_entry != NULL)
 						{
 							sum_md++;
+							transfer++;
 							oob_write = 0;
 
 							fing = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].fing;
@@ -171,7 +180,7 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 							old_ppn = find_ppn(ssd, chan, chip, die, plane, block, page);
 							new_ppn = get_new_page(ssd);
 
-							if(fing < 1 || fing > UNIQUE_PAGE_NB || ssd->dram->map->F2P_entry[fing].pn != old_ppn)
+							if(fing < 1 || fing > UNIQUE_PAGE_NB)
 							{
 								printf("ERROR: fing ERROR in GC\n");
 								getchar();
@@ -185,9 +194,11 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 
 							find_location_ppn(ssd, new_ppn, &loc);
 
-							ssd_page_read(ssd, chan, chip);
+							// ssd_page_read(ssd, chan, chip);
+							// ssd_page_write(ssd, loc.channel, loc.chip);
 
-							ssd_page_write(ssd, loc.channel, loc.chip);
+							ssd->channel_head[loc.channel].next_state_predict_time += ssd->parameter->page_capacity * ssd->parameter->time_characteristics.tWC;
+							ssd->channel_head[loc.channel].chip_head[loc.chip].next_state_predict_time += ssd->parameter->time_characteristics.tPROG;
 
 							ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].fing = fing;
 							ssd->dram->map->F2P_entry[fing].pn = new_ppn;
@@ -226,6 +237,13 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 						}						
 					}
 				}
+
+				if (transfer > 0)
+				{
+					ssd->channel_head[chan].chip_head[chip].next_state_predict_time += ssd->parameter->time_characteristics.tR;
+					time = ssd->channel_head[chan].chip_head[chip].next_state_predict_time + transfer * ssd->parameter->subpage_capacity * ssd->parameter->time_characteristics.tRC;
+					ssd->channel_head[chan].next_state_predict_time = (ssd->channel_head[chan].next_state_predict_time > time) ? ssd->channel_head[chan].next_state_predict_time : time;
+				}
 			}
 		}
 	}
@@ -259,13 +277,13 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 }
 
 //return the garbage superblock with the maximal invalid data 
-int find_victim_superblock(struct ssd_info *ssd)
+int find_victim_superblock(struct ssd_info *ssd, int *victim)
 {
-	unsigned int sb_no = 0;
-	unsigned int max_sb_cnt = 0;
-    
-	unsigned int sb_invalid;
+	int sb_no = -1;
+	int max_sb_cnt = 0;
+    int sb_invalid;
 	int i;
+
 	for (i = 0; i < ssd->sb_cnt; i++)
 	{
 		if (Is_Garbage_SBlk(ssd,i)==FAILURE)
@@ -285,7 +303,8 @@ int find_victim_superblock(struct ssd_info *ssd)
 	// }
 
 	ssd->sb_pool[sb_no].gcing = 1;
-	return sb_no;
+	*victim = sb_no;
+	return max_sb_cnt;
 }
 
 //judge whether block is garbage block 
@@ -316,6 +335,7 @@ int Get_SB_Invalid(struct ssd_info *ssd, unsigned int sb_no)
 {
 	unsigned int i, chan, chip, die, plane, block;
 	unsigned int sum_invalid = 0;
+
 	for (i = 0; i < ssd->sb_pool[sb_no].blk_cnt; i++)
 	{
 		chan = ssd->sb_pool[sb_no].pos[i].channel;
@@ -331,7 +351,9 @@ int Get_SB_Invalid(struct ssd_info *ssd, unsigned int sb_no)
 		}
 
 		sum_invalid += ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].invalid_page_num;
+
 	}
+	
 	return sum_invalid;
 }
 
