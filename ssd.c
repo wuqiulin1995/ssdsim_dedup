@@ -18,11 +18,25 @@
 int secno_num_per_page, secno_num_sub_page;
 
 char* parameters_file = "page256GB.parameters";
-char* trace_file = "homes_fing.ascii";
-char* warm_trace_file = "homes_fing.ascii";
-char* result_file_statistic = "homes_statistic.txt";
-char* result_file_ex = "homes_output.txt";
-char stat_file[50] = "dedup_base_homes.csv";
+
+// char* trace_file = "homes_fing.ascii";
+// char* trace_file = "mail5_fing.ascii";
+// char* trace_file = "trace_10_dup.ascii";
+char* trace_file = "trace_50_dup.ascii";
+
+char* warm_trace_file = "trace_30_dup.ascii";
+
+// char* result_file_statistic = "homes_statistic_base.txt";
+// char* result_file_statistic = "mail5_statistic_base.txt";
+// char* result_file_statistic = "trace_10_dup_statistic_base.txt";
+char* result_file_statistic = "trace_50_dup_statistic_base.txt";
+
+char* result_file_ex =  "trace_30_dup_output_base.txt";
+
+// char stat_file[50] = "dedup_base_homes.csv";
+// char stat_file[50] = "dedup_base_mail5.csv";
+// char stat_file[50] = "dedup_base_trace_10_dup.csv";
+char stat_file[50] = "dedup_base_trace_50_dup.csv";
 
 int main()
 {
@@ -92,12 +106,14 @@ void reset(struct ssd_info *ssd)
 		ssd->channel_head[i].channel_busy_flag = 0;
 		ssd->channel_head[i].current_time = 0;
 		ssd->channel_head[i].current_state = CHANNEL_IDLE;
+		ssd->channel_head[i].next_state = CHANNEL_IDLE;
 		ssd->channel_head[i].next_state_predict_time = 0;
 
 		for (j = 0; j < ssd->channel_head[i].chip; j++)
 		{
 			ssd->channel_head[i].chip_head[j].current_state = CHIP_IDLE;
 			ssd->channel_head[i].chip_head[j].current_time = 0;
+			ssd->channel_head[i].chip_head[j].next_state = CHIP_IDLE;
 			ssd->channel_head[i].chip_head[j].next_state_predict_time = 0;
 		}
 	}
