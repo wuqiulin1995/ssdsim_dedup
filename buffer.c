@@ -62,13 +62,19 @@ Status handle_write_request(struct ssd_info *ssd, struct request *req)
 
 	if(dup_ppn != INVALID_PPN && use_remap(ssd) == SUCCESS)
 	{
-		invalidate_old_lpn(ssd, lpn);
+		if (dup_ppn != ssd->dram->map->L2P_entry[lpn].pn)
+		{
+			invalidate_old_lpn(ssd, lpn);
 
-		update_new_page_mapping(ssd, lpn, dup_ppn);
-		update_nvram_oob(ssd, 1);
-		ssd->dram->map->in_nvram[lpn] = 1;
-
-		req->response_time = update_nvram_ts(ssd, NVRAM_WRITE_DELAY / 4) + FING_DELAY;
+			update_new_page_mapping(ssd, lpn, dup_ppn);
+			update_nvram_oob(ssd, 1);
+			ssd->dram->map->in_nvram[lpn] = 1;
+			req->response_time = update_nvram_ts(ssd, NVRAM_WRITE_DELAY / 4) + FING_DELAY;
+		}
+		else
+		{
+			req->response_time = ssd->current_time + FING_DELAY;
+		}
 
 		ssd->reduced_writes++;
 	}
@@ -86,13 +92,13 @@ Status handle_write_request(struct ssd_info *ssd, struct request *req)
 
 		req->response_time = ssd_page_write(ssd, loc.channel, loc.chip) + FING_DELAY;
 
-		ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].fing = fing;
-		ssd->dram->map->F2P_entry[fing].pn = new_ppn;
-
 		invalidate_old_lpn(ssd, lpn);
 		
 		update_new_page_mapping(ssd, lpn, new_ppn);
 		ssd->dram->map->in_nvram[lpn] = 0;
+
+		ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].fing = fing;
+		ssd->dram->map->F2P_entry[fing].pn = new_ppn;
 
 		if(ssd->free_sb_cnt <= (int)(MIN_SB_RATE * ssd->sb_cnt))
 		{

@@ -18,11 +18,25 @@
 int secno_num_per_page, secno_num_sub_page;
 
 char* parameters_file =  "page256GB.parameters";
+
+// char* trace_file = "homes_fing.ascii";
 char* trace_file = "mail5_fing.ascii";
-char* warm_trace_file = "mail5_fing.ascii";
-char* result_file_statistic = "mail5_statistic.txt";
-char* result_file_ex =  "mail5_output.txt";
-char stat_file[50] = "dedup_base_mail5.csv";
+// char* trace_file = "trace_10_dup.ascii";
+// char* trace_file = "trace_50_dup.ascii";
+
+char* warm_trace_file = "trace_30_dup.ascii";
+
+// char* result_file_statistic = "results\\log\\homes_statistic_log_320_70v.txt";
+char* result_file_statistic = "results\\log\\mail5_statistic_log_160_70v.txt";
+// char* result_file_statistic = "results\\log\\trace_10_dup_statistic_log_160_30v.txt";
+// char* result_file_statistic = "results\\log\\trace_50_dup_statistic_log_160_30v.txt";
+
+char* result_file_ex =  "trace_30_dup_output_log_160_30v.txt";
+
+// char* stat_file = "results\\log\\dedup_log_homes_320_70v.csv";
+char* stat_file = "results\\log\\dedup_log_mail5_160_70v.csv";
+// char* stat_file = "results\\log\\dedup_log_trace_10_dup_160_30v.csv";
+// char* stat_file = "results\\log\\dedup_log_trace_50_dup_160_30v.csv";
 
 int main()
 {
@@ -32,10 +46,10 @@ int main()
 	alloc_assert(ssd, "ssd");
 	memset(ssd, 0, sizeof(struct ssd_info));
 	
-	strcpy_s(ssd->parameterfilename, 50, parameters_file);
-	strcpy_s(ssd->outputfilename, 50, result_file_ex);
-	strcpy_s(ssd->statisticfilename, 50, result_file_statistic);
-	strcpy_s(ssd->stat_file_name, 50, stat_file);
+	strcpy_s(ssd->parameterfilename, 100, parameters_file);
+	strcpy_s(ssd->outputfilename, 100, result_file_ex);
+	strcpy_s(ssd->statisticfilename, 100, result_file_statistic);
+	strcpy_s(ssd->stat_file_name, 100, stat_file);
 
 	printf("tracefile:%s begin simulate-------------------------\n", ssd->tracefilename);
 	tracefile_sim(ssd);
@@ -60,7 +74,7 @@ void tracefile_sim(struct ssd_info *ssd)
 	ssd->warm_flash_cmplt = 0;
 	ssd->total_gc_count = 0;
 
-	// strcpy_s(ssd->tracefilename, 50, warm_trace_file);
+	// strcpy_s(ssd->tracefilename, 100, warm_trace_file);
 	// while(ssd->total_gc_count < 1)
 	// {
 	// 	warm_flash(ssd);
@@ -73,7 +87,7 @@ void tracefile_sim(struct ssd_info *ssd)
 	ssd->warm_flash_cmplt = 1;
 	// printf("ssd->total_gc_count = %lu\n", ssd->total_gc_count);
 
-	strcpy_s(ssd->tracefilename, 50, trace_file);
+	strcpy_s(ssd->tracefilename, 100, trace_file);
 	ssd=simulate(ssd);
 
 	statistic_output(ssd);  
@@ -94,12 +108,14 @@ void reset(struct ssd_info *ssd)
 		ssd->channel_head[i].channel_busy_flag = 0;
 		ssd->channel_head[i].current_time = 0;
 		ssd->channel_head[i].current_state = CHANNEL_IDLE;
+		ssd->channel_head[i].next_state = CHANNEL_IDLE;
 		ssd->channel_head[i].next_state_predict_time = 0;
 
 		for (j = 0; j < ssd->channel_head[i].chip; j++)
 		{
 			ssd->channel_head[i].chip_head[j].current_state = CHIP_IDLE;
 			ssd->channel_head[i].chip_head[j].current_time = 0;
+			ssd->channel_head[i].chip_head[j].next_state = CHIP_IDLE;
 			ssd->channel_head[i].chip_head[j].next_state_predict_time = 0;
 		}
 	}
@@ -214,11 +230,11 @@ void make_aged(struct ssd_info *ssd)
 	struct local loc;
 
 	max_lpn = 256 * 1024 * 1024 / 4; // 256GB / 4KB
-	dup_ppn_nb = (unsigned int)(MAX_OOB_ENTRY * 0.9 * 0.3); // 160MB NVRAM, 90% used, 30% valid entry
+	dup_ppn_nb = (unsigned int)(MAX_OOB_ENTRY * 0.9 * NVRAM_VALID); // NVRAM, 90% used, NVRAM_VALID valid entry
 	unique_ppn_nb = max_lpn - dup_ppn_nb;
 	move_ppn_nb = (unsigned int)(max_lpn / (1 - ssd->parameter->overprovide) * (1 - MIN_SB_RATE)) - unique_ppn_nb; // 256GB / 0.8 * 0.9 - unique
 
-	printf("begin make aged: max_lpn = %u, dup_ppn_nb = %u, unique_ppn_nb = %u, move_ppn_nb = %u\n", max_lpn, dup_ppn_nb, unique_ppn_nb, move_ppn_nb);
+	printf("begin make aged: NVRAM size = %d, valid entry ratio = %f, max_lpn = %u, dup_ppn_nb = %u, unique_ppn_nb = %u, move_ppn_nb = %u\n", MAX_OOB_ENTRY*16/1024/1024, NVRAM_VALID, max_lpn, dup_ppn_nb, unique_ppn_nb, move_ppn_nb);
 
 	lpn_array = (unsigned int *)malloc(sizeof(unsigned int) * max_lpn);
 	alloc_assert(lpn_array, "lpn_array");
@@ -260,6 +276,10 @@ void make_aged(struct ssd_info *ssd)
 		}
 
 		update_new_page_mapping(ssd, lpn, new_ppn);
+
+		find_location_ppn(ssd, new_ppn, &loc);
+		ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].fing = INVALID_FING;
+		ssd->dram->map->in_nvram[lpn] = 0;
 	}
 
 	// randomly invalidate and move data
@@ -278,12 +298,15 @@ void make_aged(struct ssd_info *ssd)
 			getchar();
 		}
 
-		invalidate_old_lpn(ssd, lpn);
-
 		find_location_ppn(ssd, ssd->dram->map->L2P_entry[lpn].pn, &loc);
 		sb_invalid[loc.block]++;
 
+		invalidate_old_lpn(ssd, lpn);
+
 		update_new_page_mapping(ssd, lpn, new_ppn);
+
+		find_location_ppn(ssd, new_ppn, &loc);
+		ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].fing = INVALID_FING;
 	}
 
 	// randomly dedup data
@@ -304,11 +327,14 @@ void make_aged(struct ssd_info *ssd)
 
 		lpn = lpn_array[unique_ppn_nb + i];
 
+		invalidate_old_lpn(ssd, lpn);
+
 		update_new_page_mapping(ssd, lpn, dup_ppn);
 		ssd->dram->map->in_nvram[lpn] = 1;
 	}
 
 	fprintf(ssd->statisticfile, "---------------------------make aged---------------------------\n");
+	fprintf(ssd->statisticfile, "make aged: NVRAM size = %d, valid entry ratio = %f, max_lpn = %u, dup_ppn_nb = %u, unique_ppn_nb = %u, move_ppn_nb = %u\n", MAX_OOB_ENTRY*16/1024/1024, NVRAM_VALID, max_lpn, dup_ppn_nb, unique_ppn_nb, move_ppn_nb);
 	for (i = 0; i < 2560; i++)
 	{
 		fprintf(ssd->statisticfile, "superblock[%4d] has %6u invalid page\n", i, sb_invalid[i]);
@@ -380,7 +406,7 @@ void trace_output(struct ssd_info *ssd)
 				if(req->response_time - req->time > ssd->max_write_delay_print)
 					ssd->max_write_delay_print = req->response_time - req->time;
 
-				if(ssd->warm_flash_cmplt == 1 && ssd->write_request_count > 1 && ssd->write_request_count % 50000 == 1)
+				if(ssd->warm_flash_cmplt == 1 && ssd->write_request_count % 50000 == 1)
 				{
 					ssd->avg_write_delay_print = (ssd->write_avg - ssd->last_write_avg) / 50000;
 					ssd->last_write_avg = ssd->write_avg;

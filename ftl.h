@@ -4,7 +4,7 @@
 
 Status find_active_superblock(struct ssd_info* ssd, struct request* req);
 Status SuperBlock_GC(struct ssd_info* ssd, struct request* req);
-int find_victim_superblock(struct ssd_info *ssd);
+int find_victim_superblock(struct ssd_info *ssd, int *victim);
 int Get_SB_Invalid(struct ssd_info *ssd, unsigned int sb_no);
 int get_free_sb_count(struct ssd_info* ssd);
 Status Is_Garbage_SBlk(struct ssd_info *ssd, int sb_no);

@@ -7,9 +7,12 @@
 #include <ctype.h>
 #include "avlTree.h"
 
-#define UNIQUE_PAGE_NB 1000000 // fing [1, UNIQUE_PAGE_NB]
+#define UNIQUE_PAGE_NB 20000000 // fing [1, UNIQUE_PAGE_NB]
+#define INVALID_FING 20000000
+
 #define FING_DELAY 32000 // fing compare delay, 32us
-#define MAX_OOB_ENTRY 1000000
+#define MAX_OOB_ENTRY 10485760 // 160MB 10485760, 320M 20971520, 640M 4943040
+#define NVRAM_VALID 0.7 // make aged nvram valid entry ratio
 #define OOB_ENTRY_BYTES 16
 #define NVRAM_READ_DELAY 50 // 50ns for PCM 64 byte
 #define NVRAM_WRITE_DELAY 500 // 500ns for PCM 64 byte
@@ -219,11 +222,11 @@ struct ssd_info{
 	int flag;
 	unsigned int request_queue_length;
 	
-	char parameterfilename[50];
-	char tracefilename[50];
-	char outputfilename[50];
-	char statisticfilename[50];
-	char stat_file_name[50];
+	char parameterfilename[100];
+	char tracefilename[100];
+	char outputfilename[100];
+	char statisticfilename[100];
+	char stat_file_name[100];
 
 	FILE *outputfile;
 	FILE *tracefile;
