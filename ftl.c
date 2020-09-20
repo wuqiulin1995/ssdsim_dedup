@@ -201,7 +201,7 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 				{
 					ssd->channel_head[chan].chip_head[chip].next_state_predict_time += ssd->parameter->time_characteristics.tR;
 					time = ssd->channel_head[chan].chip_head[chip].next_state_predict_time + transfer * ssd->parameter->subpage_capacity * ssd->parameter->time_characteristics.tRC;
-					ssd->channel_head[chan].next_state_predict_time = (ssd->channel_head[chan].next_state_predict_time > time) ? time : ssd->channel_head[chan].next_state_predict_time;
+					ssd->channel_head[chan].next_state_predict_time = (ssd->channel_head[chan].next_state_predict_time > time) ? ssd->channel_head[chan].next_state_predict_time : time;
 				}
 			}
 		}

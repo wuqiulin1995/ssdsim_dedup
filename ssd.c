@@ -26,17 +26,17 @@ char* trace_file = "trace_50_dup.ascii";
 
 char* warm_trace_file = "trace_30_dup.ascii";
 
-// char* result_file_statistic = "homes_statistic_base.txt";
-// char* result_file_statistic = "mail5_statistic_base.txt";
-// char* result_file_statistic = "trace_10_dup_statistic_base.txt";
-char* result_file_statistic = "trace_50_dup_statistic_base.txt";
+// char* result_file_statistic = "results\\base\\homes_statistic_base.txt";
+// char* result_file_statistic = "results\\base\\mail5_statistic_base.txt";
+// char* result_file_statistic = "results\\base\\trace_10_dup_statistic_base.txt";
+char* result_file_statistic = "results\\base\\trace_50_dup_statistic_base.txt";
 
 char* result_file_ex =  "trace_30_dup_output_base.txt";
 
-// char stat_file[50] = "dedup_base_homes.csv";
-// char stat_file[50] = "dedup_base_mail5.csv";
-// char stat_file[50] = "dedup_base_trace_10_dup.csv";
-char stat_file[50] = "dedup_base_trace_50_dup.csv";
+// char stat_file[50] = "results\\base\\dedup_base_homes.csv";
+// char stat_file[50] = "results\\base\\dedup_base_mail5.csv";
+// char stat_file[50] = "results\\base\\dedup_base_trace_10_dup.csv";
+char stat_file[50] = "results\\base\\dedup_base_trace_50_dup.csv";
 
 int main()
 {
@@ -301,6 +301,7 @@ void make_aged(struct ssd_info *ssd)
 	}
 
 	fprintf(ssd->statisticfile, "---------------------------make aged---------------------------\n");
+	fprintf(ssd->statisticfile, "make aged: max_lpn = %u, dup_ppn_nb = %u, unique_ppn_nb = %u, move_ppn_nb = %u\n", max_lpn, dup_ppn_nb, unique_ppn_nb, move_ppn_nb);
 	for (i = 0; i < 2560; i++)
 	{
 		fprintf(ssd->statisticfile, "superblock[%4d] has %6u invalid page\n", i, sb_invalid[i]);
@@ -367,7 +368,7 @@ void trace_output(struct ssd_info *ssd)
 				if(req->response_time - req->time > ssd->max_write_delay_print)
 					ssd->max_write_delay_print = req->response_time - req->time;
 
-				if(ssd->warm_flash_cmplt == 1 && ssd->write_request_count > 1 && ssd->write_request_count % 50000 == 1)
+				if(ssd->warm_flash_cmplt == 1 && ssd->write_request_count % 50000 == 1)
 				{
 					ssd->avg_write_delay_print = (ssd->write_avg - ssd->last_write_avg) / 50000;
 					ssd->last_write_avg = ssd->write_avg;
