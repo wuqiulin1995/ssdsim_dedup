@@ -142,7 +142,7 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 	unsigned int chan, chip, die, plane, block, page;
 	unsigned int lpn, old_ppn = INVALID_PPN, new_ppn = INVALID_PPN;
 	__int64 time;
-	unsigned int sum_md = 0, transfer = 0;
+	unsigned int sum_md = 0;
 	int ref_cnt;
 	struct local loc;
 
@@ -154,7 +154,6 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 		{
 			for (chip = 0; chip < ssd->parameter->chip_channel[chan]; chip++)
 			{
-				transfer = 0;
 				for (die = 0; die < ssd->parameter->die_chip; die++)
 				{
 					for (plane = 0; plane < ssd->parameter->plane_die; plane++)
@@ -163,7 +162,6 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 						if (ref_cnt > 0)
 						{
 							sum_md++;
-							transfer++;
 							lpn = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].lpn;
 
 							old_ppn = find_ppn(ssd, chan, chip, die, plane, block, page);
@@ -184,24 +182,14 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 
 							find_location_ppn(ssd, new_ppn, &loc);
 
-							// ssd_page_read(ssd, chan, chip);
-							// ssd_page_write(ssd, loc.channel, loc.chip);
-
-							ssd->channel_head[loc.channel].next_state_predict_time += ssd->parameter->page_capacity * ssd->parameter->time_characteristics.tWC;
-							ssd->channel_head[loc.channel].chip_head[loc.chip].next_state_predict_time += ssd->parameter->time_characteristics.tPROG;
+							ssd_page_read(ssd, chan, chip);
+							ssd_page_write(ssd, loc.channel, loc.chip);
 
 							invalidate_old_lpn(ssd, lpn);
 
 							update_new_page_mapping(ssd, lpn, new_ppn);
 						}
 					}
-				}
-
-				if (transfer > 0)
-				{
-					ssd->channel_head[chan].chip_head[chip].next_state_predict_time += ssd->parameter->time_characteristics.tR;
-					time = ssd->channel_head[chan].chip_head[chip].next_state_predict_time + transfer * ssd->parameter->subpage_capacity * ssd->parameter->time_characteristics.tRC;
-					ssd->channel_head[chan].next_state_predict_time = (ssd->channel_head[chan].next_state_predict_time > time) ? ssd->channel_head[chan].next_state_predict_time : time;
 				}
 			}
 		}
