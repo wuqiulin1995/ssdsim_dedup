@@ -19,24 +19,24 @@ int secno_num_per_page, secno_num_sub_page;
 
 char* parameters_file =  "page256GB.parameters";
 
-// char* trace_file = "homes_fing.ascii";
-char* trace_file = "mail5_fing.ascii";
+char* trace_file = "homes_fing.ascii";
+// char* trace_file = "mail5_fing.ascii";
 // char* trace_file = "trace_10_dup.ascii";
 // char* trace_file = "trace_50_dup.ascii";
 
 char* warm_trace_file = "trace_30_dup.ascii";
 
-// char* result_file_statistic = "results\\log\\homes_statistic_log_320_70v.txt";
-char* result_file_statistic = "results\\log\\mail5_statistic_log_160_70v.txt";
-// char* result_file_statistic = "results\\log\\trace_10_dup_statistic_log_160_30v.txt";
-// char* result_file_statistic = "results\\log\\trace_50_dup_statistic_log_160_30v.txt";
+char* result_file_statistic = "results\\nlog\\homes_statistic_log_640_30v.txt";
+// char* result_file_statistic = "results\\nlog\\mail5_statistic_log_160_70v.txt";
+// char* result_file_statistic = "results\\nlog\\trace_10_dup_statistic_log_160_30v.txt";
+// char* result_file_statistic = "results\\nlog\\trace_50_dup_statistic_log_160_30v.txt";
 
 char* result_file_ex =  "trace_30_dup_output_log_160_30v.txt";
 
-// char* stat_file = "results\\log\\dedup_log_homes_320_70v.csv";
-char* stat_file = "results\\log\\dedup_log_mail5_160_70v.csv";
-// char* stat_file = "results\\log\\dedup_log_trace_10_dup_160_30v.csv";
-// char* stat_file = "results\\log\\dedup_log_trace_50_dup_160_30v.csv";
+char* stat_file = "results\\nlog\\dedup_log_homes_640_30v.csv";
+// char* stat_file = "results\\nlog\\dedup_log_mail5_160_70v.csv";
+// char* stat_file = "results\\nlog\\dedup_log_trace_10_dup_160_30v.csv";
+// char* stat_file = "results\\nlog\\dedup_log_trace_50_dup_160_30v.csv";
 
 int main()
 {

@@ -11,8 +11,8 @@
 #define INVALID_FING 20000000
 
 #define FING_DELAY 32000 // fing compare delay, 32us
-#define MAX_OOB_ENTRY 10485760 // 160MB 10485760, 320M 20971520, 640M 4943040
-#define NVRAM_VALID 0.7 // make aged nvram valid entry ratio
+#define MAX_OOB_ENTRY 41943040 // 160MB 10485760, 320M 20971520, 640M 41943040
+#define NVRAM_VALID 0.3 // make aged nvram valid entry ratio
 #define OOB_ENTRY_BYTES 16
 #define NVRAM_READ_DELAY 50 // 50ns for PCM 64 byte
 #define NVRAM_WRITE_DELAY 500 // 500ns for PCM 64 byte
