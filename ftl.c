@@ -155,7 +155,7 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 	unsigned int chan, chip, die, plane, block, page;
 	unsigned int lpn, old_ppn = INVALID_PPN, new_ppn = INVALID_PPN, fing = 0;
 	__int64 time;
-	unsigned int sum_md = 0, transfer = 0, page_sb = 0;
+	unsigned int sum_md = 0, page_sb = 0;
 	struct local loc;
 	int oob_write = 0;
 	int entry_nb = 0;
@@ -169,7 +169,7 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 	if(Get_SB_Invalid(ssd, victim) < page_sb && entry_nb > 0)
 	{
 		nvram_read_time = (__int64)entry_nb * OOB_ENTRY_BYTES / 64 * NVRAM_READ_DELAY;
-		ssd->nvram_seg[block].next_avail_time += nvram_read_time;
+		update_nvram_ts(ssd, block, nvram_read_time);
 	}
 
 	if(nvram_read_time > 0)
@@ -194,7 +194,6 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 		{
 			for (chip = 0; chip < ssd->parameter->chip_channel[chan]; chip++)
 			{
-				transfer = 0;
 				for (die = 0; die < ssd->parameter->die_chip; die++)
 				{
 					for (plane = 0; plane < ssd->parameter->plane_die; plane++)
@@ -204,7 +203,6 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 						if(lpn_entry != NULL)
 						{
 							sum_md++;
-							transfer++;
 							oob_write = 0;
 
 							fing = ssd->channel_head[chan].chip_head[chip].die_head[die].plane_head[plane].blk_head[block].page_head[page].fing;
@@ -228,9 +226,6 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 
 							ssd_page_read(ssd, chan, chip);
 							ssd_page_write(ssd, loc.channel, loc.chip);
-
-							// ssd->channel_head[loc.channel].next_state_predict_time += ssd->parameter->page_capacity * ssd->parameter->time_characteristics.tWC;
-							// ssd->channel_head[loc.channel].chip_head[loc.chip].next_state_predict_time += ssd->parameter->time_characteristics.tPROG;
 							
 							ssd->channel_head[loc.channel].chip_head[loc.chip].die_head[loc.die].plane_head[loc.plane].blk_head[loc.block].page_head[loc.page].fing = fing;
 							ssd->dram->map->F2P_entry[fing].pn = new_ppn;
@@ -260,7 +255,7 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 									update_nvram_oob(ssd, loc.block, 1);
 									ssd->dram->map->in_nvram[lpn] = 1;
 
-									ssd->nvram_seg[loc.block].next_avail_time += NVRAM_WRITE_DELAY / 4;
+									update_nvram_ts(ssd, loc.block, NVRAM_WRITE_DELAY / 4);
 								}
 
 								tmp_entry = tmp_entry->next;
@@ -272,13 +267,6 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 						}					
 					}
 				}
-
-				// if (transfer > 0)
-				// {
-				// 	ssd->channel_head[chan].chip_head[chip].next_state_predict_time += ssd->parameter->time_characteristics.tR;
-				// 	time = ssd->channel_head[chan].chip_head[chip].next_state_predict_time + transfer * ssd->parameter->page_capacity * ssd->parameter->time_characteristics.tRC;
-				// 	ssd->channel_head[chan].next_state_predict_time = (ssd->channel_head[chan].next_state_predict_time > time) ? ssd->channel_head[chan].next_state_predict_time : time;
-				// }
 			}
 		}
 	}
