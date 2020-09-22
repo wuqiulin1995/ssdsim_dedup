@@ -67,9 +67,16 @@ Status handle_write_request(struct ssd_info *ssd, struct request *req)
 			invalidate_old_lpn(ssd, lpn);
 
 			update_new_page_mapping(ssd, lpn, dup_ppn);
+			if(ssd->nvram_log->cache_entry == OOB_ENTRY_PAGE-1)
+			{
+				req->response_time = update_nvram_ts(ssd, LOG_WRITE_DELAY) + FING_DELAY;
+			}
+			else
+			{
+				req->response_time = ssd->current_time + FING_DELAY;
+			}
 			update_nvram_oob(ssd, 1);
 			ssd->dram->map->in_nvram[lpn] = 1;
-			req->response_time = update_nvram_ts(ssd, NVRAM_WRITE_DELAY / 4) + FING_DELAY;
 		}
 		else
 		{

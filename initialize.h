@@ -11,11 +11,13 @@
 #define INVALID_FING 20000000
 
 #define FING_DELAY 32000 // fing compare delay, 32us
-#define MAX_OOB_ENTRY 10485760 // 160MB 10485760, 320M 20971520, 640M 4943040
+#define MAX_OOB_ENTRY 10485504 // 160MB 10485504, 320M 20971264, 640M 41942784
 #define NVRAM_VALID 0.7 // make aged nvram valid entry ratio
 #define OOB_ENTRY_BYTES 16
-#define NVRAM_READ_DELAY 50 // 50ns for PCM 64 byte
-#define NVRAM_WRITE_DELAY 500 // 500ns for PCM 64 byte
+#define OOB_ENTRY_PAGE 256
+#define ERASE_TIME 2 // 2 3 5
+#define LOG_READ_DELAY 50000 // 50us flash page read
+#define LOG_WRITE_DELAY 500000 // 500us flash page write
 #define INVALID_ENTRY_THRE 0.05
 
 #define SECTOR 512
@@ -530,6 +532,7 @@ struct LPN_ENTRY{
 
 struct NVRAM_OOB_LOG{
 	__int64 next_avail_time;
+	unsigned int cache_entry;
 	unsigned int total_entry;
 	unsigned int invalid_entry;
 };

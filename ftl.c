@@ -166,8 +166,8 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 	total_entry = ssd->nvram_log->total_entry;
 	if(Get_SB_Invalid(ssd, victim) < page_sb && total_entry > 0)
 	{
-		nvram_read_time = (__int64)total_entry * OOB_ENTRY_BYTES / 64 * NVRAM_READ_DELAY;
-		ssd->nvram_log->next_avail_time += nvram_read_time;
+		nvram_read_time = (__int64)total_entry / OOB_ENTRY_PAGE * LOG_READ_DELAY / 16 + (__int64)total_entry * OOB_ENTRY_BYTES / 64 * 50;
+		update_nvram_ts(ssd, nvram_read_time);
 	}
 
 	if(nvram_read_time > 0)
@@ -256,13 +256,16 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 								}
 								else
 								{
-									if(ssd->nvram_log->total_entry >= MAX_OOB_ENTRY && ssd->invalid_oob_entry > 0)
+									if(ssd->nvram_log->total_entry >= MAX_OOB_ENTRY-OOB_ENTRY_PAGE && ssd->invalid_oob_entry > OOB_ENTRY_PAGE)
 										nvram_oob_gc(ssd);
+
+									if(ssd->nvram_log->cache_entry == OOB_ENTRY_PAGE -1)
+									{
+										update_nvram_ts(ssd, LOG_WRITE_DELAY);
+									}
 
 									update_nvram_oob(ssd, 1);
 									ssd->dram->map->in_nvram[lpn] = 1;
-
-									ssd->nvram_log->next_avail_time += NVRAM_WRITE_DELAY / 4;
 								}
 
 								tmp_entry = tmp_entry->next;
@@ -570,11 +573,18 @@ Status update_nvram_oob(struct ssd_info *ssd, int type)
 	unsigned int total_entry = 0, invalid_entry = 0;
 	if(type == 1)
 	{
-		ssd->nvram_log->total_entry++;
-		ssd->total_oob_entry++;
+		ssd->nvram_log->cache_entry++;
 
-		if(ssd->total_oob_entry > MAX_OOB_ENTRY)
-			printf("ERROR: ssd->total_oob_entry > MAX_OOB_ENTRY\n");
+		if(ssd->nvram_log->cache_entry == OOB_ENTRY_PAGE)
+		{
+			ssd->nvram_log->total_entry += OOB_ENTRY_PAGE;
+			ssd->total_oob_entry += OOB_ENTRY_PAGE;
+
+			if(ssd->total_oob_entry > MAX_OOB_ENTRY)
+				printf("ERROR: ssd->total_oob_entry > MAX_OOB_ENTRY\n");
+			
+			ssd->nvram_log->cache_entry = 0;
+		}
 	}
 	else if(type == 0)
 	{
@@ -608,10 +618,11 @@ Status nvram_oob_gc(struct ssd_info *ssd)
 
 	update_nvram_oob(ssd, 0);
 
-	ssd->nvram_log->total_entry = valid_entry;
-	ssd->total_oob_entry = valid_entry;
+	ssd->nvram_log->total_entry = (valid_entry + ssd->nvram_log->cache_entry) / OOB_ENTRY_PAGE * OOB_ENTRY_PAGE;
+	ssd->nvram_log->cache_entry = valid_entry + ssd->nvram_log->cache_entry - ssd->nvram_log->total_entry;
+	ssd->total_oob_entry = ssd->nvram_log->total_entry;
 
-	nvram_oob_rw_time = (__int64)total_entry * OOB_ENTRY_BYTES / 64 * NVRAM_READ_DELAY + (__int64)valid_entry * OOB_ENTRY_BYTES / 64 * NVRAM_WRITE_DELAY;
+	nvram_oob_rw_time = (__int64)total_entry / OOB_ENTRY_PAGE * LOG_READ_DELAY / 16 + (__int64)total_entry * OOB_ENTRY_BYTES / 64 * 50 + (__int64)(ssd->nvram_log->total_entry) / OOB_ENTRY_PAGE * LOG_WRITE_DELAY / 16 + 5000000 * ERASE_TIME;
 
 	update_nvram_ts(ssd, nvram_oob_rw_time);
 

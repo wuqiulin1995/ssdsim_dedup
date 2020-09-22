@@ -78,6 +78,7 @@ struct ssd_info *initiation(struct ssd_info *ssd)
 	ssd->nvram_log = (struct NVRAM_OOB_LOG *)malloc(sizeof(struct NVRAM_OOB_LOG));
 	alloc_assert(ssd->nvram_log, "ssd->nvram_log");
 	ssd->nvram_log->next_avail_time = 0;
+	ssd->nvram_log->cache_entry = 0;
 	ssd->nvram_log->total_entry = 0;
 	ssd->nvram_log->invalid_entry = 0;
 	ssd->total_oob_entry = 0;
