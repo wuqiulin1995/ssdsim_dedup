@@ -181,12 +181,13 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 				ssd->channel_head[i].chip_head[j].next_state_predict_time += nvram_read_time;
 			}
 		}
-		update_nvram_oob(ssd, victim, 0);
 
 		ssd->gcr_nvram_print++;
 		ssd->gcr_nvram_delay_print += nvram_read_time;
 		ssd->avg_gcr_nvram_delay = ssd->gcr_nvram_delay_print / ssd->gcr_nvram_print;
 	}
+	
+	update_nvram_oob(ssd, victim, 0);
 
 	for (page = 0; page < ssd->parameter->page_block; page++)
 	{
