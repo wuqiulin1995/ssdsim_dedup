@@ -97,11 +97,10 @@ void tracefile_sim(struct ssd_info *ssd)
 
 void reset(struct ssd_info *ssd)
 {
-	int i, j, sb_num;
+	int i, j;
 	initialize_statistic(ssd);
 
-	sb_num = ssd->parameter->block_plane;
-	for(i = 0; i < sb_num; i++)
+	for(i = 0; i < ssd->sb_cnt; i++)
 	{
 		ssd->nvram_seg[i].next_avail_time = 0;
 	}

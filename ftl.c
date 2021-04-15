@@ -181,12 +181,13 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 				ssd->channel_head[i].chip_head[j].next_state_predict_time += nvram_read_time;
 			}
 		}
-		update_nvram_oob(ssd, victim, 0);
 
 		ssd->gcr_nvram_print++;
 		ssd->gcr_nvram_delay_print += nvram_read_time;
 		ssd->avg_gcr_nvram_delay = ssd->gcr_nvram_delay_print / ssd->gcr_nvram_print;
 	}
+	
+	update_nvram_oob(ssd, victim, 0);
 
 	for (page = 0; page < ssd->parameter->page_block; page++)
 	{
@@ -606,12 +607,10 @@ Status update_nvram_oob(struct ssd_info *ssd, unsigned int block, int type)
 
 Status nvram_oob_gc(struct ssd_info *ssd)
 {
-	int max_invalid_entry = 0, entry_nb = 0, valid_entry = 0, victim_seg = -1, i = 0, sb_num = 0;
+	int max_invalid_entry = 0, entry_nb = 0, valid_entry = 0, victim_seg = -1, i = 0;
 	__int64 nvram_oob_rw_time = 0;
 
-	sb_num = ssd->parameter->block_plane;
-
-	for(i = 0; i < sb_num; i++)
+	for(i = 0; i < ssd->sb_cnt; i++)
 	{
 		if(ssd->nvram_seg[i].invalid_entry > max_invalid_entry)
 		{
