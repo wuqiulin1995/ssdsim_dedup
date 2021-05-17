@@ -112,3 +112,17 @@ __int64 update_nvram_ts(struct ssd_info *ssd, unsigned int block, __int64 need_t
 
 	return 	ssd->nvram_seg[block].next_avail_time;
 }
+
+__int64 update_flash_oob_ts(struct ssd_info *ssd, __int64 need_time)
+{
+	if(ssd->flash_oob->next_avail_time < ssd->current_time)
+	{
+		ssd->flash_oob->next_avail_time = ssd->current_time + need_time;
+	}
+	else
+	{
+		ssd->flash_oob->next_avail_time += need_time;
+	}
+
+	return 	ssd->flash_oob->next_avail_time;
+}

@@ -12,12 +12,17 @@
 
 #define FING_DELAY 32000 // fing compare delay, 32us
 #define NVRAM_VALID 0.7 // make aged nvram valid entry ratio
-#define MAX_OOB_SEG 327680 // 160M 163840 320M 327680 640M 655360
+#define MAX_OOB_SEG 327680 // 160M 163840 320M 327680 640M 655360 80M 81920 40M 40960 10M 10240
 #define OOB_ENTRY_PER_SEG 64 // 1KB seg
 #define OOB_ENTRY_BYTES 16
 #define NVRAM_READ_DELAY 50 // 50ns for PCM 64 byte
 #define NVRAM_WRITE_DELAY 500 // 500ns for PCM 64 byte
-#define INVALID_ENTRY_THRE 0.05
+#define INVALID_ENTRY_THRE 0.15
+
+#define OOB_ENTRY_PER_PAGE 256 // 4096 / 16 = 256
+#define MAX_OOB_SB 2 // 2 falsh superblocks for remapping log
+#define MAX_FLASH_OOB_PAGE 65536 // 2 falsh superblocks for remapping log (1024*32*2)
+#define CHIP_PARA 16 // chip parallelism
 
 #define SECTOR 512
 #define BUFSIZE 200
@@ -234,6 +239,7 @@ struct ssd_info{
 
 	FILE *stat_file;
 	struct NVRAM_OOB_SEG *nvram_seg;
+	struct FLASH_OOB *flash_oob;
 
     struct parameter_value *parameter;   //SSD parameter
 	struct dram_info *dram;
@@ -537,6 +543,15 @@ struct NVRAM_OOB_SEG{
 	int alloc_seg;
 	int free_entry;
 	int invalid_entry;
+
+	int alloc_page;  // flash page OOB
+	int total_entry_page;
+	int invalid_entry_page;
+};
+
+struct FLASH_OOB{
+	__int64 next_avail_time;
+	int alloc_page;
 };
 
 struct local{          

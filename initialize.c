@@ -56,7 +56,7 @@ struct ssd_info *initiation(struct ssd_info *ssd)
 	char buffer[300];
 	struct parameter_value *parameters;
 	FILE *fp=NULL;
-	int i = 0, sb_num = 0;
+	int i = 0;
 	
 	//Import the configuration file for ssd
 	parameters=load_parameters(ssd->parameterfilename);
@@ -76,17 +76,25 @@ struct ssd_info *initiation(struct ssd_info *ssd)
     //initialize the superblock info 
 	intialize_sb(ssd);
 
-	sb_num = ssd->parameter->block_plane;
-
-	ssd->nvram_seg = (struct NVRAM_OOB_SEG *)malloc(sizeof(struct NVRAM_OOB_SEG)*sb_num);
+	ssd->nvram_seg = (struct NVRAM_OOB_SEG *)malloc(sizeof(struct NVRAM_OOB_SEG)*(ssd->sb_cnt));
 	alloc_assert(ssd->nvram_seg, "ssd->nvram_seg");
-	for(i = 0; i < sb_num; i++)
+	for(i = 0; i < ssd->sb_cnt; i++)
 	{
 		ssd->nvram_seg[i].next_avail_time = 0;
 		ssd->nvram_seg[i].alloc_seg = 0;
 		ssd->nvram_seg[i].free_entry = 0;
 		ssd->nvram_seg[i].invalid_entry = 0;
+
+		ssd->nvram_seg[i].alloc_page = 0;
+		ssd->nvram_seg[i].total_entry_page = 0;
+		ssd->nvram_seg[i].invalid_entry_page = 0;
 	}
+
+	ssd->flash_oob = (struct FLASH_OOB *)malloc(sizeof(struct FLASH_OOB));
+	alloc_assert(ssd->flash_oob, "ssd->flash_oob");
+	ssd->flash_oob->next_avail_time = 0;
+	ssd->flash_oob->alloc_page = 0;
+
 	ssd->total_oob_entry = 0;
 	ssd->invalid_oob_entry = 0;
 	ssd->total_alloc_seg = 0;

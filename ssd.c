@@ -26,17 +26,17 @@ char* trace_file = "homes_fing.ascii";
 
 char* warm_trace_file = "trace_30_dup.ascii";
 
-char* result_file_statistic = "results\\seg\\homes_statistic_seg1K_320_70v.txt";
-// char* result_file_statistic = "results\\seg\\mail5_statistic_seg1K_160_30v.txt";
-// char* result_file_statistic = "results\\seg\\trace_10_dup_statistic_seg1K_160_70v.txt";
-// char* result_file_statistic = "results\\seg\\trace_50_dup_statistic_seg1K_160_70v.txt";
+char* result_file_statistic = "results\\seg_move\\homes_statistic_seg1K_move_320_70v.txt";
+// char* result_file_statistic = "results\\seg_move\\mail5_statistic_seg1K_move_160_30v.txt";
+// char* result_file_statistic = "results\\seg_move\\trace_10_dup_statistic_seg1K_move_160_70v.txt";
+// char* result_file_statistic = "results\\seg_move\\trace_50_dup_statistic_seg1K_move_160_70v.txt";
 
 char* result_file_ex =  "trace_30_dup_output_seg1K_160_70v.txt";
 
-char* stat_file = "results\\seg\\dedup_seg1K_homes_320_70v.csv";
-// char* stat_file = "results\\seg\\dedup_seg1K_mail5_160_30v.csv";
-// char* stat_file = "results\\seg\\dedup_seg1K_trace_10_dup_160_70v.csv";
-// char* stat_file = "results\\seg\\dedup_seg1K_trace_50_dup_160_70v.csv";
+char* stat_file = "results\\seg_move\\dedup_seg1K_move_homes_320_70v.csv";
+// char* stat_file = "results\\seg_move\\dedup_seg1K_move_mail5_160_30v.csv";
+// char* stat_file = "results\\seg_move\\dedup_seg1K_move_trace_10_dup_160_70v.csv";
+// char* stat_file = "results\\seg_move\\dedup_seg1K_move_trace_50_dup_160_70v.csv";
 
 
 int main()
@@ -97,14 +97,14 @@ void tracefile_sim(struct ssd_info *ssd)
 
 void reset(struct ssd_info *ssd)
 {
-	int i, j, sb_num;
+	int i, j;
 	initialize_statistic(ssd);
 
-	sb_num = ssd->parameter->block_plane;
-	for(i = 0; i < sb_num; i++)
+	for(i = 0; i < ssd->sb_cnt; i++)
 	{
 		ssd->nvram_seg[i].next_avail_time = 0;
 	}
+	ssd->flash_oob->next_avail_time = 0;
 
 	//reset the time 
 	ssd->current_time = 0;

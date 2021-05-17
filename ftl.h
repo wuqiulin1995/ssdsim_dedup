@@ -21,4 +21,6 @@ Status decrease_reverse_mapping(struct ssd_info *ssd, unsigned int ppn, unsigned
 
 Status update_nvram_oob(struct ssd_info *ssd, unsigned int block, int type);
 Status nvram_oob_gc(struct ssd_info *ssd);
+Status flash_oob_gc(struct ssd_info *ssd);
+Status move_entry_to_flash(struct ssd_info *ssd, int ex_block);
 Status use_remap(struct ssd_info *ssd, unsigned int block);
