@@ -26,15 +26,15 @@ char* trace_file = "homes_fing.ascii";
 
 char* warm_trace_file = "trace_30_dup.ascii";
 
-char* result_file_statistic = "results\\seg_move\\homes_statistic_seg1K_move_320_70v.txt";
-// char* result_file_statistic = "results\\seg_move\\mail5_statistic_seg1K_move_160_30v.txt";
+char* result_file_statistic = "results\\seg_move\\homes_statistic_seg1K_move_5_70v.txt";
+// char* result_file_statistic = "results\\seg_move\\mail5_statistic_seg1K_move_5_70v.txt";
 // char* result_file_statistic = "results\\seg_move\\trace_10_dup_statistic_seg1K_move_160_70v.txt";
 // char* result_file_statistic = "results\\seg_move\\trace_50_dup_statistic_seg1K_move_160_70v.txt";
 
 char* result_file_ex =  "trace_30_dup_output_seg1K_160_70v.txt";
 
-char* stat_file = "results\\seg_move\\dedup_seg1K_move_homes_320_70v.csv";
-// char* stat_file = "results\\seg_move\\dedup_seg1K_move_mail5_160_30v.csv";
+char* stat_file = "results\\seg_move\\dedup_seg1K_move_homes_5_70v.csv";
+// char* stat_file = "results\\seg_move\\dedup_seg1K_move_mail5_5_70v.csv";
 // char* stat_file = "results\\seg_move\\dedup_seg1K_move_trace_10_dup_160_70v.csv";
 // char* stat_file = "results\\seg_move\\dedup_seg1K_move_trace_50_dup_160_70v.csv";
 
@@ -358,8 +358,7 @@ void make_aged(struct ssd_info *ssd)
 	unsigned int chan, chip, die, plane, block, page;
 	unsigned int *lpn_array = NULL, i = 0, exchange = 0, tmp = 0;
 	unsigned int rand_idx = 0, lpn = 0, new_ppn = 0, dup_ppn = 0;
-	unsigned int sb_invalid[2560];
-	unsigned int sb_entry_valid[2560], sb_entry = 0;
+	int sb_invalid[2560], sb_entry_valid[2560], invalid_entry = 0;
 	struct local loc;
 
 	max_lpn = 256 * 1024 * 1024 / 4; // 256GB / 4KB
@@ -482,30 +481,45 @@ void make_aged(struct ssd_info *ssd)
 	free(lpn_array);
 	lpn_array = NULL;
 
-	for(i = 0; i < ssd->sb_cnt; i++)
+	invalid_entry = (int)(dup_ppn_nb / NVRAM_VALID - dup_ppn_nb);
+
+	for (i = 0; i < ssd->sb_cnt; i++)
 	{
 		if (sb_entry_valid[i] != 0)
 		{
-			sb_entry = (unsigned int)(sb_entry_valid[i] / NVRAM_VALID);
-			ssd->nvram_seg[i].alloc_seg = (sb_entry_valid[i] - 1) / OOB_ENTRY_PER_SEG + 1;
-			ssd->nvram_seg[i].alloc_seg += (sb_entry - ssd->nvram_seg[i].alloc_seg * OOB_ENTRY_PER_SEG) / OOB_ENTRY_PER_SEG;
+			ssd->nvram_seg[i].alloc_seg = (sb_entry_valid[i] + OOB_ENTRY_PER_SEG - 1) / OOB_ENTRY_PER_SEG;
 			ssd->nvram_seg[i].free_entry = 0;
 			ssd->nvram_seg[i].invalid_entry = ssd->nvram_seg[i].alloc_seg * OOB_ENTRY_PER_SEG - sb_entry_valid[i] - ssd->nvram_seg[i].free_entry;
-		}
 
-		if(ssd->nvram_seg[i].alloc_seg != 0)
-		{
+			invalid_entry -= ssd->nvram_seg[i].invalid_entry;
+
 			ssd->total_alloc_seg += ssd->nvram_seg[i].alloc_seg;
 			ssd->total_oob_entry += ssd->nvram_seg[i].alloc_seg * OOB_ENTRY_PER_SEG - ssd->nvram_seg[i].free_entry;
 			ssd->invalid_oob_entry += ssd->nvram_seg[i].invalid_entry;
 		}
-
-		sb_entry = 0;
 	}
 
-	if (ssd->total_alloc_seg > (unsigned int)(MAX_OOB_SEG * 0.9))
+	for (i = 0; invalid_entry > 0; i++)
 	{
-		printf("ERROR too many segs: total = %u, alloc = %u\n", ssd->total_alloc_seg, (unsigned int)(MAX_OOB_SEG * 0.9));
+		i = i % 2560;
+		if (sb_entry_valid[i] != 0)
+		{
+			ssd->nvram_seg[i].alloc_seg++;
+			ssd->nvram_seg[i].invalid_entry += OOB_ENTRY_PER_SEG;
+
+			invalid_entry -= OOB_ENTRY_PER_SEG;
+
+			ssd->total_alloc_seg++;
+			ssd->total_oob_entry += OOB_ENTRY_PER_SEG;
+			ssd->invalid_oob_entry += OOB_ENTRY_PER_SEG;
+		}
+	}
+
+	printf("invalid entry ratio = %f, total alloc seg = %u\n", (float)ssd->invalid_oob_entry / ssd->total_oob_entry, ssd->total_alloc_seg);
+
+	if (ssd->total_alloc_seg > MAX_OOB_SEG)
+	{
+		printf("ERROR too many segs: alloc = %u, max = %u\n", ssd->total_alloc_seg, MAX_OOB_SEG);
 		getchar();
 	}
 

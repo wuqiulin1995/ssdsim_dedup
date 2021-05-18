@@ -263,15 +263,15 @@ int migration_horizon(struct ssd_info* ssd, struct request* req, unsigned int vi
 								}
 								else
 								{
-									update_nvram_oob(ssd, loc.block, 1);
-									ssd->dram->map->in_nvram[lpn] = 1;
-
-									update_nvram_ts(ssd, loc.block, NVRAM_WRITE_DELAY / 4);
-									
 									if(ssd->total_alloc_seg >= MAX_OOB_SEG)
 									{
 										move_entry_to_flash(ssd, block);
 									}
+									
+									update_nvram_oob(ssd, loc.block, 1);
+									ssd->dram->map->in_nvram[lpn] = 1;
+
+									update_nvram_ts(ssd, loc.block, NVRAM_WRITE_DELAY / 4);
 								}
 
 								tmp_entry = tmp_entry->next;
