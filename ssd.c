@@ -26,15 +26,15 @@ char* trace_file = "homes_fing.ascii";
 
 char* warm_trace_file = "trace_30_dup.ascii";
 
-char* result_file_statistic = "results\\seg_move\\homes_statistic_seg1K_move_5_70v.txt";
-// char* result_file_statistic = "results\\seg_move\\mail5_statistic_seg1K_move_5_70v.txt";
+char* result_file_statistic = "results\\seg_move\\homes_statistic_seg1K_move_20_70v.txt";
+// char* result_file_statistic = "results\\seg_move\\mail5_statistic_seg1K_move_20_70v.txt";
 // char* result_file_statistic = "results\\seg_move\\trace_10_dup_statistic_seg1K_move_160_70v.txt";
 // char* result_file_statistic = "results\\seg_move\\trace_50_dup_statistic_seg1K_move_160_70v.txt";
 
 char* result_file_ex =  "trace_30_dup_output_seg1K_160_70v.txt";
 
-char* stat_file = "results\\seg_move\\dedup_seg1K_move_homes_5_70v.csv";
-// char* stat_file = "results\\seg_move\\dedup_seg1K_move_mail5_5_70v.csv";
+char* stat_file = "results\\seg_move\\dedup_seg1K_move_homes_20_70v.csv";
+// char* stat_file = "results\\seg_move\\dedup_seg1K_move_mail5_20_70v.csv";
 // char* stat_file = "results\\seg_move\\dedup_seg1K_move_trace_10_dup_160_70v.csv";
 // char* stat_file = "results\\seg_move\\dedup_seg1K_move_trace_50_dup_160_70v.csv";
 
